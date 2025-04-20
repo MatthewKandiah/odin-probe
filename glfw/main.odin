@@ -1,5 +1,7 @@
 package main
 
+import "base:runtime"
+import "core:c"
 import "core:fmt"
 import "vendor:glfw"
 import vk "vendor:vulkan"
@@ -15,13 +17,35 @@ State :: struct {
 main :: proc() {
 	state: State
 
-	glfw.Init()
+	if !glfw.Init() {
+		panic("glfwInit failed")
+	}
 	defer glfw.Terminate()
+
+	errorCallback :: proc "c" (error: c.int, description: cstring) {
+		context = runtime.default_context()
+		fmt.eprintln("ERROR", error, description)
+		panic("glfw error")
+	}
+	glfw.SetErrorCallback(errorCallback)
 
 	if !createWindow(&state) {
 		panic("createWindow failed")
 	}
 	defer glfw.DestroyWindow(state.window)
+
+	keyCallback :: proc "c" (
+		window: glfw.WindowHandle,
+		key: c.int,
+		scancode: c.int,
+		action: c.int,
+		mods: c.int,
+	) {
+		if (key == glfw.KEY_ESCAPE && action == glfw.PRESS) {
+			glfw.SetWindowShouldClose(window, glfw.TRUE)
+		}
+	}
+	glfw.SetKeyCallback(state.window, keyCallback)
 
 	if !initVulkan(&state) {
 		panic("initVulkan failed")
