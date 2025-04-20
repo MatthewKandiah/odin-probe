@@ -17,9 +17,8 @@ Context :: struct {
 	vk_instance_ptr: ^vk.Instance,
 }
 
-state: State
-
 main :: proc() {
+	state: State
 
 	glfw.Init()
 	defer glfw.Terminate()
@@ -71,6 +70,7 @@ initVulkan :: proc(state: ^State) -> (success: bool) {
 		enabledLayerCount       = 0,
 	}
 
+	context.user_ptr = state
 	loadVulkanDispatchTable()
 	if res := vk.CreateInstance(&instance_create_info, nil, &state.vk_instance);
 	   res != vk.Result.SUCCESS {
@@ -82,6 +82,7 @@ initVulkan :: proc(state: ^State) -> (success: bool) {
 
 loadVulkanDispatchTable :: proc() {
 	getProcAddress :: proc(p: rawptr, name: cstring) {
+		state := cast(^State)context.user_ptr
 		(cast(^rawptr)p)^ = glfw.GetInstanceProcAddress(state.vk_instance, name)
 	}
 	vk.load_proc_addresses(getProcAddress)
