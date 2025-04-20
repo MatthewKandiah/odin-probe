@@ -1,7 +1,6 @@
 package main
 
 import "core:fmt"
-GLFW_INCLUDE_VULKAN :: true
 import "vendor:glfw"
 import vk "vendor:vulkan"
 
