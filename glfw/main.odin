@@ -13,10 +13,6 @@ State :: struct {
 	window:      glfw.WindowHandle,
 }
 
-Context :: struct {
-	vk_instance_ptr: ^vk.Instance,
-}
-
 main :: proc() {
 	state: State
 
