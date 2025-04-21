@@ -9,8 +9,8 @@ import "vendor:glfw"
 import vk "vendor:vulkan"
 
 State :: struct {
-	vk_instance:   vk.Instance,
-	window: glfw.WindowHandle,
+	vk_instance: vk.Instance,
+	window:      glfw.WindowHandle,
 }
 
 main :: proc() {
@@ -33,13 +33,15 @@ main :: proc() {
 	}
 	defer glfw.DestroyWindow(state.window)
 
-  if !init_vulkan(&state) {
-    panic("init_vulkan failed")
-  }
+	if !init_vulkan(&state) {
+		panic("init_vulkan failed")
+	}
+	defer vk.DestroyInstance(state.vk_instance, nil)
 
-  for !glfw.WindowShouldClose(state.window) {
-    glfw.PollEvents()
-  }
+	for !glfw.WindowShouldClose(state.window) {
+		glfw.PollEvents()
+	}
+
 	// set up validation layers for sanity checking
 	// pick a physical device - integrated gpu with most memory?
 	// create logical device and graphics queue and presentation queue
