@@ -47,7 +47,6 @@ main :: proc() {
 		glfw.PollEvents()
 	}
 
-	// pick a physical device - integrated gpu with most memory?
 	// create logical device and graphics queue and presentation queue
 	// create surface
 	// create swap chain (including its image views)
