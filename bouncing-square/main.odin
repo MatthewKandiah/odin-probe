@@ -9,8 +9,9 @@ import "vendor:glfw"
 import vk "vendor:vulkan"
 
 State :: struct {
-	vk_instance: vk.Instance,
-	window:      glfw.WindowHandle,
+	vk_instance:     vk.Instance,
+	physical_device: vk.PhysicalDevice,
+	window:          glfw.WindowHandle,
 }
 
 main :: proc() {
@@ -38,34 +39,9 @@ main :: proc() {
 	}
 	defer vk.DestroyInstance(state.vk_instance, nil)
 
-	// WIP - pick a physical device
-	physical_device_count: u32
-	vk.EnumeratePhysicalDevices(state.vk_instance, &physical_device_count, nil)
-	if physical_device_count == 0 {
-		panic("failed to find a Vulkan compatible device")
+	if !get_physical_gpu(&state) {
+		panic("get physical gpu failed")
 	}
-	physical_devices := make([]vk.PhysicalDevice, physical_device_count)
-	if vk.EnumeratePhysicalDevices(
-		   state.vk_instance,
-		   &physical_device_count,
-		   raw_data(physical_devices),
-	   ) !=
-	   vk.Result.SUCCESS {
-		panic("enumerate physical devices failed")
-	}
-	is_device_suitable :: proc(properties: vk.PhysicalDeviceProperties) -> bool {
-		return properties.deviceType == .DISCRETE_GPU || properties.deviceType == .INTEGRATED_GPU
-	}
-	for physical_device in physical_devices {
-		properties: vk.PhysicalDeviceProperties
-		vk.GetPhysicalDeviceProperties(physical_device, &properties)
-		fmt.println(
-			cast(cstring)&properties.deviceName[0],
-			"suitable:",
-			is_device_suitable(properties),
-		)
-	}
-  // end WIP
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()

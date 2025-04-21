@@ -23,9 +23,9 @@ init_vulkan :: proc(state: ^State) -> (success: bool) {
 	glfw_extensions := glfw.GetRequiredInstanceExtensions()
 
 	if !check_validation_layer_support() {
-    fmt.eprintln("required layers not supported")
-    return false
-  }
+		fmt.eprintln("required layers not supported")
+		return false
+	}
 
 	instance_create_info := vk.InstanceCreateInfo {
 		sType                   = .INSTANCE_CREATE_INFO,
@@ -51,13 +51,13 @@ check_validation_layer_support :: proc() -> bool {
 	count: u32
 	vk.EnumerateInstanceLayerProperties(&count, nil)
 	available_layers := make([]vk.LayerProperties, count)
-	if vk.EnumerateInstanceLayerProperties(&count, raw_data(available_layers)) != vk.Result.SUCCESS {
-    panic("enumerate instance layer properties failed")
-  }
+	if vk.EnumerateInstanceLayerProperties(&count, raw_data(available_layers)) !=
+	   vk.Result.SUCCESS {
+		panic("enumerate instance layer properties failed")
+	}
 
 	for required_layer_name in required_layer_names {
 		found := false
-		fmt.println("Checking for layer", required_layer_name)
 		for &available_layer in available_layers {
 			available_layer_name := cast(cstring)&available_layer.layerName[0]
 			if required_layer_name == available_layer_name {
@@ -67,4 +67,33 @@ check_validation_layer_support :: proc() -> bool {
 		if !found {return false}
 	}
 	return true
+}
+
+get_physical_gpu :: proc(state: ^State) -> (success: bool) {
+	physical_device_count: u32
+	vk.EnumeratePhysicalDevices(state.vk_instance, &physical_device_count, nil)
+	if physical_device_count == 0 {
+		panic("failed to find a Vulkan compatible device")
+	}
+	physical_devices := make([]vk.PhysicalDevice, physical_device_count)
+	if vk.EnumeratePhysicalDevices(
+		   state.vk_instance,
+		   &physical_device_count,
+		   raw_data(physical_devices),
+	   ) !=
+	   vk.Result.SUCCESS {
+		panic("enumerate physical devices failed")
+	}
+
+	for physical_device in physical_devices {
+		properties: vk.PhysicalDeviceProperties
+		vk.GetPhysicalDeviceProperties(physical_device, &properties)
+		if properties.deviceType == .DISCRETE_GPU {
+			state.physical_device = physical_device
+			return true
+		} else if properties.deviceType == .INTEGRATED_GPU {
+			state.physical_device = physical_device
+		}
+	}
+	return state.physical_device != nil
 }
