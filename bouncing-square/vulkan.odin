@@ -17,7 +17,7 @@ init_vulkan :: proc(state: ^State) -> (success: bool) {
 		applicationVersion = vk.MAKE_VERSION(1, 0, 0),
 		pEngineName        = "magic",
 		engineVersion      = vk.MAKE_VERSION(1, 0, 0),
-		apiVersion         = vk.API_VERSION_1_4,
+		apiVersion         = vk.API_VERSION_1_0,
 	}
 
 	glfw_extensions := glfw.GetRequiredInstanceExtensions()
@@ -50,9 +50,10 @@ load_vulkan_dispatch_table :: proc() {
 check_validation_layer_support :: proc() -> bool {
 	count: u32
 	vk.EnumerateInstanceLayerProperties(&count, nil)
-
 	available_layers := make([]vk.LayerProperties, count)
-	vk.EnumerateInstanceLayerProperties(&count, raw_data(available_layers))
+	if vk.EnumerateInstanceLayerProperties(&count, raw_data(available_layers)) != vk.Result.SUCCESS {
+    panic("enumerate instance layer properties failed")
+  }
 
 	for required_layer_name in required_layer_names {
 		found := false
