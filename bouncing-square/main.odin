@@ -9,8 +9,9 @@ import "vendor:glfw"
 import vk "vendor:vulkan"
 
 State :: struct {
-	vk_instance:     vk.Instance,
+	instance:        vk.Instance,
 	physical_device: vk.PhysicalDevice,
+	device:          vk.Device,
 	window:          glfw.WindowHandle,
 }
 
@@ -37,11 +38,16 @@ main :: proc() {
 	if !init_vulkan(&state) {
 		panic("init_vulkan failed")
 	}
-	defer vk.DestroyInstance(state.vk_instance, nil)
+	defer vk.DestroyInstance(state.instance, nil)
 
 	if !get_physical_gpu(&state) {
 		panic("get physical gpu failed")
 	}
+
+  if !create_device(&state) {
+    panic("create device failed")
+  }
+  defer vk.DestroyDevice(state.device, nil)
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
