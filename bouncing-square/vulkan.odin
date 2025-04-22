@@ -120,18 +120,42 @@ create_device :: proc(state: ^State) -> (success: bool) {
 	)
 
 	graphics_index_found: bool = false
+	present_index_found: bool = false
 	for i: u32 = 0; i < cast(u32)len(queue_family_properties); i += 1 {
 		queue_family_properties := queue_family_properties[i]
 		if vk.QueueFlag.GRAPHICS in queue_family_properties.queueFlags {
 			state.graphics_queue_family_index = i
 			graphics_index_found = true
-			break
 		}
 
-		// TODO-Matt: create a KHR surface, then we'll need to get a queue family index for a present queue compatible with that surface
+		present_supported: b32
+		res := vk.GetPhysicalDeviceSurfaceSupportKHR(
+			state.physical_device,
+			i,
+			state.surface,
+			&present_supported,
+		)
+		if res != vk.Result.SUCCESS {
+			panic("failed to check surface presentation support")
+		}
+		if present_supported {
+			state.present_queue_family_index = i
+			present_index_found = true
+		}
+
+		// seems simplest to just use one queue family if possible? Not sure what's actually best to do here
+		if present_index_found &&
+		   graphics_index_found &&
+		   state.graphics_queue_family_index == state.present_queue_family_index {
+			break
+		}
 	}
+
 	if !graphics_index_found {
 		panic("failed to find graphics queue family index")
+	}
+	if !present_index_found {
+		panic("failed to find present queue family index")
 	}
 
 	queue_priority: f32 = 1
@@ -149,18 +173,22 @@ create_device :: proc(state: ^State) -> (success: bool) {
 		queueCreateInfoCount = cast(u32)len(queue_create_infos),
 	}
 
-	return(
-		vk.CreateDevice(state.physical_device, &device_create_info, nil, &state.device) ==
-		vk.Result.SUCCESS \
-	)
+	res := vk.CreateDevice(state.physical_device, &device_create_info, nil, &state.device)
+  if res != vk.Result.SUCCESS {
+    return false
+  }
+
+	get_queue_handles(state)
+	return true
 }
 
-get_queue_handle :: proc(state: ^State) {
+get_queue_handles :: proc(state: ^State) {
 	if state.device == nil {
 		panic("cannot get queue handle before creating logical device")
 	}
 	// assumes we are only grabbing one queue per queue family
 	vk.GetDeviceQueue(state.device, state.graphics_queue_family_index, 0, &state.graphics_queue)
+	vk.GetDeviceQueue(state.device, state.present_queue_family_index, 0, &state.present_queue)
 }
 
 create_window_surface :: proc(state: ^State) -> (success: bool) {

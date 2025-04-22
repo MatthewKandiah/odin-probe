@@ -14,6 +14,8 @@ State :: struct {
 	device:                      vk.Device,
 	graphics_queue_family_index: u32,
 	graphics_queue:              vk.Queue,
+	present_queue_family_index:  u32,
+	present_queue:               vk.Queue,
 	surface:                     vk.SurfaceKHR,
 	window:                      glfw.WindowHandle,
 }
@@ -43,10 +45,10 @@ main :: proc() {
 	}
 	defer vk.DestroyInstance(state.instance, nil)
 
-  if !create_window_surface(&state) {
-    panic("create window surface failed")
-  }
-  defer vk.DestroySurfaceKHR(state.instance, state.surface, nil)
+	if !create_window_surface(&state) {
+		panic("create window surface failed")
+	}
+	defer vk.DestroySurfaceKHR(state.instance, state.surface, nil)
 
 	if !get_physical_gpu(&state) {
 		panic("get physical gpu failed")
@@ -56,8 +58,6 @@ main :: proc() {
 		panic("create device failed")
 	}
 	defer vk.DestroyDevice(state.device, nil)
-
-	get_queue_handle(&state)
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
