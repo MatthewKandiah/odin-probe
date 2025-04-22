@@ -130,9 +130,9 @@ create_device :: proc(state: ^State) -> (success: bool) {
 
 		// TODO-Matt: create a KHR surface, then we'll need to get a queue family index for a present queue compatible with that surface
 	}
-  if !graphics_index_found {
-    panic("failed to find graphics queue family index")
-  }
+	if !graphics_index_found {
+		panic("failed to find graphics queue family index")
+	}
 
 	queue_priority: f32 = 1
 	graphics_queue_create_info := vk.DeviceQueueCreateInfo {
@@ -155,12 +155,17 @@ create_device :: proc(state: ^State) -> (success: bool) {
 	)
 }
 
-get_queue_handle :: proc(state: ^State) -> (success: bool) {
+get_queue_handle :: proc(state: ^State) {
 	if state.device == nil {
 		panic("cannot get queue handle before creating logical device")
 	}
 	// assumes we are only grabbing one queue per queue family
 	vk.GetDeviceQueue(state.device, state.graphics_queue_family_index, 0, &state.graphics_queue)
+}
 
-	return true
+create_window_surface :: proc(state: ^State) -> (success: bool) {
+	return(
+		glfw.CreateWindowSurface(state.instance, state.window, nil, &state.surface) ==
+		vk.Result.SUCCESS \
+	)
 }
