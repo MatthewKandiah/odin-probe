@@ -7,6 +7,8 @@ import vk "vendor:vulkan"
 
 required_layer_names := []cstring{"VK_LAYER_KHRONOS_validation"}
 
+required_extension_names := []cstring{vk.KHR_SWAPCHAIN_EXTENSION_NAME}
+
 init_vulkan :: proc(state: ^State) -> (success: bool) {
 	context.user_ptr = state
 	load_vulkan_dispatch_table()
@@ -70,6 +72,28 @@ check_validation_layer_support :: proc() -> bool {
 	return true
 }
 
+check_extension_support :: proc(device: vk.PhysicalDevice) -> bool {
+	count: u32
+	vk.EnumerateDeviceExtensionProperties(device, nil, &count, nil)
+	extension_properties := make([]vk.ExtensionProperties, count)
+	defer delete(extension_properties)
+	vk.EnumerateDeviceExtensionProperties(device, nil, &count, raw_data(extension_properties))
+
+	for required_extension_name in required_extension_names {
+		found := false
+		for available_extension_properties in extension_properties {
+			available_extension_name := available_extension_properties.extensionName
+			if cast(cstring)&available_extension_name[0] == required_extension_name {
+				found = true
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 get_physical_gpu :: proc(state: ^State) -> (success: bool) {
 	physical_device_count: u32
 	vk.EnumeratePhysicalDevices(state.instance, &physical_device_count, nil)
@@ -89,6 +113,9 @@ get_physical_gpu :: proc(state: ^State) -> (success: bool) {
 
 	for physical_device in physical_devices {
 		properties: vk.PhysicalDeviceProperties
+		if !check_extension_support(physical_device) {
+			continue
+		}
 		vk.GetPhysicalDeviceProperties(physical_device, &properties)
 		if properties.deviceType == .DISCRETE_GPU {
 			state.physical_device = physical_device
@@ -173,9 +200,11 @@ create_device :: proc(state: ^State) -> (success: bool) {
 
 	queue_create_infos: []vk.DeviceQueueCreateInfo = {device_queue_create_info}
 	device_create_info := vk.DeviceCreateInfo {
-		sType                = .DEVICE_CREATE_INFO,
-		pQueueCreateInfos    = raw_data(queue_create_infos),
-		queueCreateInfoCount = cast(u32)len(queue_create_infos),
+		sType                   = .DEVICE_CREATE_INFO,
+		pQueueCreateInfos       = raw_data(queue_create_infos),
+		queueCreateInfoCount    = cast(u32)len(queue_create_infos),
+		ppEnabledExtensionNames = raw_data(required_extension_names),
+		enabledExtensionCount   = cast(u32)len(required_extension_names),
 	}
 
 	res := vk.CreateDevice(state.physical_device, &device_create_info, nil, &state.device)

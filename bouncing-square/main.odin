@@ -63,8 +63,6 @@ main :: proc() {
 		glfw.PollEvents()
 	}
 
-	// create logical device and graphics queue and presentation queue
-	// create surface
 	// create swap chain (including its image views)
 	// create graphics pipeline (including its framebuffers wrapping needed image views)
 	// create command pool and command buffer
