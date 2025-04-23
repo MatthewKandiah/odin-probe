@@ -18,6 +18,7 @@ State :: struct {
 	present_queue:               vk.Queue,
 	surface:                     vk.SurfaceKHR,
 	window:                      glfw.WindowHandle,
+	swapchain:                   vk.SwapchainKHR,
 }
 
 main :: proc() {
@@ -59,10 +60,16 @@ main :: proc() {
 	}
 	defer vk.DestroyDevice(state.device, nil)
 
+	if !create_swapchain(&state) {
+		panic("create swapchain failed")
+	}
+	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
+
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
 	}
 
+	// create vertex buffer
 	// create swap chain (including its image views)
 	// create graphics pipeline (including its framebuffers wrapping needed image views)
 	// create command pool and command buffer

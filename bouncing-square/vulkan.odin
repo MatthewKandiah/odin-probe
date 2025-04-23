@@ -231,3 +231,23 @@ create_window_surface :: proc(state: ^State) -> (success: bool) {
 		vk.Result.SUCCESS \
 	)
 }
+
+create_swapchain :: proc(state: ^State) -> (success: bool) {
+	if state.device == nil {
+		panic("cannot create swapchain before creating logical device")
+	}
+
+	swapchain_create_info := vk.SwapchainCreateInfoKHR {
+		sType        = .SWAPCHAIN_CREATE_INFO_KHR,
+		surface      = state.surface,
+		oldSwapchain = 0, // VK_NULL_HANDLE
+		// TODO-Matt: need to fill a bunch of these fields in
+	}
+
+	if res := vk.CreateSwapchainKHR(state.device, &swapchain_create_info, nil, &state.swapchain);
+	   res != vk.Result.SUCCESS {
+		return false
+	}
+
+	return true
+}
