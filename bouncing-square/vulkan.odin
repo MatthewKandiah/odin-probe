@@ -157,16 +157,21 @@ create_device :: proc(state: ^State) -> (success: bool) {
 	if !present_index_found {
 		panic("failed to find present queue family index")
 	}
+	if state.graphics_queue_family_index != state.present_queue_family_index {
+		panic(
+			"assumed from here that graphics and present queues are using the same queue family index",
+		)
+	}
 
 	queue_priority: f32 = 1
-	graphics_queue_create_info := vk.DeviceQueueCreateInfo {
+	device_queue_create_info := vk.DeviceQueueCreateInfo {
 		sType            = .DEVICE_QUEUE_CREATE_INFO,
 		queueFamilyIndex = state.graphics_queue_family_index,
 		queueCount       = 1,
 		pQueuePriorities = &queue_priority,
 	}
 
-	queue_create_infos: []vk.DeviceQueueCreateInfo = {graphics_queue_create_info}
+	queue_create_infos: []vk.DeviceQueueCreateInfo = {device_queue_create_info}
 	device_create_info := vk.DeviceCreateInfo {
 		sType                = .DEVICE_CREATE_INFO,
 		pQueueCreateInfos    = raw_data(queue_create_infos),
@@ -174,9 +179,9 @@ create_device :: proc(state: ^State) -> (success: bool) {
 	}
 
 	res := vk.CreateDevice(state.physical_device, &device_create_info, nil, &state.device)
-  if res != vk.Result.SUCCESS {
-    return false
-  }
+	if res != vk.Result.SUCCESS {
+		return false
+	}
 
 	get_queue_handles(state)
 	return true
