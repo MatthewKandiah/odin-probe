@@ -23,6 +23,7 @@ State :: struct {
 	supported_surface_present_modes: []vk.PresentModeKHR,
 	surface_format:                  vk.SurfaceFormatKHR,
 	present_mode:                    vk.PresentModeKHR,
+	extent:                          vk.Extent2D,
 }
 
 main :: proc() {
@@ -73,6 +74,10 @@ main :: proc() {
 		panic("get supported present modes failed")
 	}
 	defer delete(state.supported_surface_present_modes)
+
+  if !get_swap_exent(&state) {
+    panic("get swap extent failed")
+  }
 
 	// if !create_swapchain(&state) {
 	// 	panic("create swapchain failed")

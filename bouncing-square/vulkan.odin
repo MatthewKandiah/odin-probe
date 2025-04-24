@@ -240,7 +240,8 @@ create_swapchain :: proc(state: ^State) -> (success: bool) {
 		sType        = .SWAPCHAIN_CREATE_INFO_KHR,
 		surface      = state.surface,
 		oldSwapchain = 0, // VK_NULL_HANDLE
-		// TODO-Matt: need to fill a bunch of these fields in
+		imageFormat  = state.surface_format.format,
+		presentMode  = state.present_mode,
 	}
 
 	if res := vk.CreateSwapchainKHR(state.device, &swapchain_create_info, nil, &state.swapchain);
@@ -330,6 +331,40 @@ get_physical_device_surface_present_modes :: proc(state: ^State) -> (success: bo
 	}
 	if !mode_selected {
 		state.present_mode = vk.PresentModeKHR.FIFO
+	}
+
+	return true
+}
+
+get_swap_exent :: proc(state: ^State) -> (success: bool) {
+	surface_capabilities: vk.SurfaceCapabilitiesKHR
+	if res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(
+		state.physical_device,
+		state.surface,
+		&surface_capabilities,
+	); res != vk.Result.SUCCESS {
+		return false
+	}
+
+	// special value, indicates size will be determined by extent of a swapchain targeting the surface
+	if surface_capabilities.currentExtent.width == max(u32) {
+		width, height := glfw.GetFramebufferSize(state.window)
+		extent: vk.Extent2D = {
+			width  = clamp(
+				cast(u32)width,
+				surface_capabilities.minImageExtent.width,
+				surface_capabilities.maxImageExtent.width,
+			),
+			height = clamp(
+				cast(u32)height,
+				surface_capabilities.minImageExtent.height,
+				surface_capabilities.maxImageExtent.height,
+			),
+		}
+    state.extent = extent
+	} else {
+		// default case, set swapchain extent to match the screens current extent
+		state.extent = surface_capabilities.currentExtent
 	}
 
 	return true
