@@ -21,6 +21,8 @@ State :: struct {
 	swapchain:                       vk.SwapchainKHR,
 	supported_surface_formats:       []vk.SurfaceFormatKHR,
 	supported_surface_present_modes: []vk.PresentModeKHR,
+	surface_format:                  vk.SurfaceFormatKHR,
+	present_mode:                    vk.PresentModeKHR,
 }
 
 main :: proc() {
@@ -70,7 +72,7 @@ main :: proc() {
 	if !get_physical_device_surface_present_modes(&state) {
 		panic("get supported present modes failed")
 	}
-  defer delete(state.supported_surface_present_modes)
+	defer delete(state.supported_surface_present_modes)
 
 	// if !create_swapchain(&state) {
 	// 	panic("create swapchain failed")

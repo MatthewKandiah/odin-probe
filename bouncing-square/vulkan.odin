@@ -276,6 +276,20 @@ get_physical_device_surface_formats :: proc(state: ^State) -> (success: bool) {
 	}
 
 	state.supported_surface_formats = formats
+
+	format_selected := false
+	for available_format in formats {
+		// select preferred format if it's supported, else just take the first supported format
+		if available_format.format == vk.Format.B8G8R8A8_SRGB &&
+		   available_format.colorSpace == vk.ColorSpaceKHR.SRGB_NONLINEAR {
+			state.surface_format = available_format
+			format_selected = true
+			break
+		}
+	}
+	if !format_selected {
+		state.surface_format = formats[0]
+	}
 	return true
 }
 
@@ -304,5 +318,19 @@ get_physical_device_surface_present_modes :: proc(state: ^State) -> (success: bo
 	}
 
 	state.supported_surface_present_modes = modes
+
+	mode_selected := false
+	for available_mode in modes {
+		// select preferred present mode if it's supported, else just take FIFO because it's guaranteed to be supported
+		if available_mode == vk.PresentModeKHR.MAILBOX {
+			state.present_mode = available_mode
+			mode_selected = true
+			break
+		}
+	}
+	if !mode_selected {
+		state.present_mode = vk.PresentModeKHR.FIFO
+	}
+
 	return true
 }
