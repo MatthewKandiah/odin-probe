@@ -9,16 +9,18 @@ import "vendor:glfw"
 import vk "vendor:vulkan"
 
 State :: struct {
-	instance:                    vk.Instance,
-	physical_device:             vk.PhysicalDevice,
-	device:                      vk.Device,
-	graphics_queue_family_index: u32,
-	graphics_queue:              vk.Queue,
-	present_queue_family_index:  u32,
-	present_queue:               vk.Queue,
-	surface:                     vk.SurfaceKHR,
-	window:                      glfw.WindowHandle,
-	swapchain:                   vk.SwapchainKHR,
+	instance:                        vk.Instance,
+	physical_device:                 vk.PhysicalDevice,
+	device:                          vk.Device,
+	graphics_queue_family_index:     u32,
+	graphics_queue:                  vk.Queue,
+	present_queue_family_index:      u32,
+	present_queue:                   vk.Queue,
+	surface:                         vk.SurfaceKHR,
+	window:                          glfw.WindowHandle,
+	swapchain:                       vk.SwapchainKHR,
+	supported_surface_formats:       []vk.SurfaceFormatKHR,
+	supported_surface_present_modes: []vk.PresentModeKHR,
 }
 
 main :: proc() {
@@ -60,10 +62,20 @@ main :: proc() {
 	}
 	defer vk.DestroyDevice(state.device, nil)
 
-	if !create_swapchain(&state) {
-		panic("create swapchain failed")
+	if !get_physical_device_surface_formats(&state) {
+		panic("get supported formats failed")
 	}
-	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
+	defer delete(state.supported_surface_formats)
+
+	if !get_physical_device_surface_present_modes(&state) {
+		panic("get supported present modes failed")
+	}
+  defer delete(state.supported_surface_present_modes)
+
+	// if !create_swapchain(&state) {
+	// 	panic("create swapchain failed")
+	// }
+	// defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()

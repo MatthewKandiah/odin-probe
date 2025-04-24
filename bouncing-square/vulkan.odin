@@ -156,13 +156,12 @@ create_device :: proc(state: ^State) -> (success: bool) {
 		}
 
 		present_supported: b32
-		res := vk.GetPhysicalDeviceSurfaceSupportKHR(
+		if res := vk.GetPhysicalDeviceSurfaceSupportKHR(
 			state.physical_device,
 			i,
 			state.surface,
 			&present_supported,
-		)
-		if res != vk.Result.SUCCESS {
+		); res != vk.Result.SUCCESS {
 			panic("failed to check surface presentation support")
 		}
 		if present_supported {
@@ -207,8 +206,8 @@ create_device :: proc(state: ^State) -> (success: bool) {
 		enabledExtensionCount   = cast(u32)len(required_extension_names),
 	}
 
-	res := vk.CreateDevice(state.physical_device, &device_create_info, nil, &state.device)
-	if res != vk.Result.SUCCESS {
+	if res := vk.CreateDevice(state.physical_device, &device_create_info, nil, &state.device);
+	   res != vk.Result.SUCCESS {
 		return false
 	}
 
@@ -249,5 +248,61 @@ create_swapchain :: proc(state: ^State) -> (success: bool) {
 		return false
 	}
 
+	return true
+}
+
+get_physical_device_surface_formats :: proc(state: ^State) -> (success: bool) {
+	if state.physical_device == nil {
+		panic("cannot query supported formats before creating physical device")
+	}
+	if state.surface == 0 {
+		panic("cannot query supported formats before creating surface")
+	}
+
+	count: u32
+	vk.GetPhysicalDeviceSurfaceFormatsKHR(state.physical_device, state.surface, &count, nil)
+	if count == 0 {
+		return false
+	}
+
+	formats := make([]vk.SurfaceFormatKHR, count)
+	if res := vk.GetPhysicalDeviceSurfaceFormatsKHR(
+		state.physical_device,
+		state.surface,
+		&count,
+		raw_data(formats),
+	); res != vk.Result.SUCCESS {
+		return false
+	}
+
+	state.supported_surface_formats = formats
+	return true
+}
+
+get_physical_device_surface_present_modes :: proc(state: ^State) -> (success: bool) {
+	if state.physical_device == nil {
+		panic("cannot query supported present modes before creating physical device")
+	}
+	if state.surface == 0 {
+		panic("cannot query supported present modes before creating surface")
+	}
+
+	count: u32
+	vk.GetPhysicalDeviceSurfacePresentModesKHR(state.physical_device, state.surface, &count, nil)
+	if count == 0 {
+		return false
+	}
+
+	modes := make([]vk.PresentModeKHR, count)
+	if res := vk.GetPhysicalDeviceSurfacePresentModesKHR(
+		state.physical_device,
+		state.surface,
+		&count,
+		raw_data(modes),
+	); res != vk.Result.SUCCESS {
+		return false
+	}
+
+	state.supported_surface_present_modes = modes
 	return true
 }
