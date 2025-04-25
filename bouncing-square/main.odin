@@ -94,7 +94,6 @@ main :: proc() {
 		glfw.PollEvents()
 	}
 
-	// create vertex buffer
 	// create swap chain (including its image views)
 	// create graphics pipeline (including its framebuffers wrapping needed image views)
 	// create command pool and command buffer
