@@ -383,3 +383,9 @@ get_swap_exent :: proc(state: ^State) -> (success: bool) {
 
 	return true
 }
+
+get_swapchain_images :: proc(using state: ^State) {
+	vk.GetSwapchainImagesKHR(device, swapchain, &swapchain_image_count, nil)
+	swapchain_images = make([]vk.Image, swapchain_image_count)
+	vk.GetSwapchainImagesKHR(device, swapchain, &swapchain_image_count, raw_data(swapchain_images))
+}

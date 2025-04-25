@@ -9,22 +9,24 @@ import "vendor:glfw"
 import vk "vendor:vulkan"
 
 State :: struct {
+	device:                          vk.Device,
+	extent:                          vk.Extent2D,
+	graphics_queue:                  vk.Queue,
+	graphics_queue_family_index:     u32,
 	instance:                        vk.Instance,
 	physical_device:                 vk.PhysicalDevice,
-	device:                          vk.Device,
-	graphics_queue_family_index:     u32,
-	graphics_queue:                  vk.Queue,
-	present_queue_family_index:      u32,
+	present_mode:                    vk.PresentModeKHR,
 	present_queue:                   vk.Queue,
-	surface:                         vk.SurfaceKHR,
-	window:                          glfw.WindowHandle,
-	swapchain:                       vk.SwapchainKHR,
+	present_queue_family_index:      u32,
 	supported_surface_formats:       []vk.SurfaceFormatKHR,
 	supported_surface_present_modes: []vk.PresentModeKHR,
-	surface_format:                  vk.SurfaceFormatKHR,
-	present_mode:                    vk.PresentModeKHR,
-	extent:                          vk.Extent2D,
+	surface:                         vk.SurfaceKHR,
 	surface_capabilities:            vk.SurfaceCapabilitiesKHR,
+	surface_format:                  vk.SurfaceFormatKHR,
+	swapchain:                       vk.SwapchainKHR,
+	swapchain_image_count:           u32,
+	swapchain_images:                []vk.Image,
+	window:                          glfw.WindowHandle,
 }
 
 main :: proc() {
@@ -84,6 +86,8 @@ main :: proc() {
 		panic("create swapchain failed")
 	}
 	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
+
+	get_swapchain_images(&state)
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
