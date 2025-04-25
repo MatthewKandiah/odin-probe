@@ -24,6 +24,7 @@ State :: struct {
 	surface_format:                  vk.SurfaceFormatKHR,
 	present_mode:                    vk.PresentModeKHR,
 	extent:                          vk.Extent2D,
+	surface_capabilities:            vk.SurfaceCapabilitiesKHR,
 }
 
 main :: proc() {
@@ -75,14 +76,14 @@ main :: proc() {
 	}
 	defer delete(state.supported_surface_present_modes)
 
-  if !get_swap_exent(&state) {
-    panic("get swap extent failed")
-  }
+	if !get_swap_exent(&state) {
+		panic("get swap extent failed")
+	}
 
-	// if !create_swapchain(&state) {
-	// 	panic("create swapchain failed")
-	// }
-	// defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
+	if !create_swapchain(&state) {
+		panic("create swapchain failed")
+	}
+	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()

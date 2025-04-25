@@ -236,12 +236,27 @@ create_swapchain :: proc(state: ^State) -> (success: bool) {
 		panic("cannot create swapchain before creating logical device")
 	}
 
+	if state.graphics_queue_family_index != state.present_queue_family_index {
+		panic(
+			"I've assumed these values will be equal, imageSharingMode exclusive will not work if they are different",
+		)
+	}
+
 	swapchain_create_info := vk.SwapchainCreateInfoKHR {
-		sType        = .SWAPCHAIN_CREATE_INFO_KHR,
-		surface      = state.surface,
-		oldSwapchain = 0, // VK_NULL_HANDLE
-		imageFormat  = state.surface_format.format,
-		presentMode  = state.present_mode,
+		sType            = .SWAPCHAIN_CREATE_INFO_KHR,
+		surface          = state.surface,
+		oldSwapchain     = 0, // VK_NULL_HANDLE
+		imageFormat      = state.surface_format.format,
+		imageColorSpace  = state.surface_format.colorSpace,
+		presentMode      = state.present_mode,
+		imageExtent      = state.extent,
+		minImageCount    = state.surface_capabilities.minImageCount + 1,
+		imageUsage       = {.COLOR_ATTACHMENT},
+		imageArrayLayers = 1,
+		imageSharingMode = .EXCLUSIVE,
+		compositeAlpha   = {.OPAQUE},
+		clipped          = true,
+		preTransform     = state.surface_capabilities.currentTransform,
 	}
 
 	if res := vk.CreateSwapchainKHR(state.device, &swapchain_create_info, nil, &state.swapchain);
@@ -337,34 +352,33 @@ get_physical_device_surface_present_modes :: proc(state: ^State) -> (success: bo
 }
 
 get_swap_exent :: proc(state: ^State) -> (success: bool) {
-	surface_capabilities: vk.SurfaceCapabilitiesKHR
 	if res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(
 		state.physical_device,
 		state.surface,
-		&surface_capabilities,
+		&state.surface_capabilities,
 	); res != vk.Result.SUCCESS {
 		return false
 	}
 
 	// special value, indicates size will be determined by extent of a swapchain targeting the surface
-	if surface_capabilities.currentExtent.width == max(u32) {
+	if state.surface_capabilities.currentExtent.width == max(u32) {
 		width, height := glfw.GetFramebufferSize(state.window)
 		extent: vk.Extent2D = {
 			width  = clamp(
 				cast(u32)width,
-				surface_capabilities.minImageExtent.width,
-				surface_capabilities.maxImageExtent.width,
+				state.surface_capabilities.minImageExtent.width,
+				state.surface_capabilities.maxImageExtent.width,
 			),
 			height = clamp(
 				cast(u32)height,
-				surface_capabilities.minImageExtent.height,
-				surface_capabilities.maxImageExtent.height,
+				state.surface_capabilities.minImageExtent.height,
+				state.surface_capabilities.maxImageExtent.height,
 			),
 		}
-    state.extent = extent
+		state.extent = extent
 	} else {
 		// default case, set swapchain extent to match the screens current extent
-		state.extent = surface_capabilities.currentExtent
+		state.extent = state.surface_capabilities.currentExtent
 	}
 
 	return true
