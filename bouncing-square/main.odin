@@ -88,6 +88,7 @@ main :: proc() {
 	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
 
 	get_swapchain_images(&state)
+  defer delete(state.swapchain_images)
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
