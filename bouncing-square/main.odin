@@ -10,7 +10,6 @@ import vk "vendor:vulkan"
 
 State :: struct {
 	device:                          vk.Device,
-	extent:                          vk.Extent2D,
 	graphics_queue:                  vk.Queue,
 	graphics_queue_family_index:     u32,
 	instance:                        vk.Instance,
@@ -22,8 +21,9 @@ State :: struct {
 	supported_surface_present_modes: []vk.PresentModeKHR,
 	surface:                         vk.SurfaceKHR,
 	surface_capabilities:            vk.SurfaceCapabilitiesKHR,
-	surface_format:                  vk.SurfaceFormatKHR,
 	swapchain:                       vk.SwapchainKHR,
+	swapchain_extent:                          vk.Extent2D,
+	swapchain_format:                  vk.SurfaceFormatKHR,
 	swapchain_image_count:           u32,
 	swapchain_images:                []vk.Image,
 	window:                          glfw.WindowHandle,

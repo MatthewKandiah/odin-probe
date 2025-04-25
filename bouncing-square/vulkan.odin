@@ -246,10 +246,10 @@ create_swapchain :: proc(state: ^State) -> (success: bool) {
 		sType            = .SWAPCHAIN_CREATE_INFO_KHR,
 		surface          = state.surface,
 		oldSwapchain     = 0, // VK_NULL_HANDLE
-		imageFormat      = state.surface_format.format,
-		imageColorSpace  = state.surface_format.colorSpace,
+		imageFormat      = state.swapchain_format.format,
+		imageColorSpace  = state.swapchain_format.colorSpace,
 		presentMode      = state.present_mode,
-		imageExtent      = state.extent,
+		imageExtent      = state.swapchain_extent,
 		minImageCount    = state.surface_capabilities.minImageCount + 1,
 		imageUsage       = {.COLOR_ATTACHMENT},
 		imageArrayLayers = 1,
@@ -298,13 +298,13 @@ get_physical_device_surface_formats :: proc(state: ^State) -> (success: bool) {
 		// select preferred format if it's supported, else just take the first supported format
 		if available_format.format == vk.Format.B8G8R8A8_SRGB &&
 		   available_format.colorSpace == vk.ColorSpaceKHR.SRGB_NONLINEAR {
-			state.surface_format = available_format
+			state.swapchain_format = available_format
 			format_selected = true
 			break
 		}
 	}
 	if !format_selected {
-		state.surface_format = formats[0]
+		state.swapchain_format = formats[0]
 	}
 	return true
 }
@@ -375,10 +375,10 @@ get_swap_exent :: proc(state: ^State) -> (success: bool) {
 				state.surface_capabilities.maxImageExtent.height,
 			),
 		}
-		state.extent = extent
+		state.swapchain_extent = extent
 	} else {
 		// default case, set swapchain extent to match the screens current extent
-		state.extent = state.surface_capabilities.currentExtent
+		state.swapchain_extent = state.surface_capabilities.currentExtent
 	}
 
 	return true
