@@ -389,3 +389,37 @@ get_swapchain_images :: proc(using state: ^State) {
 	swapchain_images = make([]vk.Image, swapchain_image_count)
 	vk.GetSwapchainImagesKHR(device, swapchain, &swapchain_image_count, raw_data(swapchain_images))
 }
+
+create_swapchain_image_views :: proc(using state: ^State) -> (success: bool) {
+	if state.swapchain_images == nil {
+		panic("cannot create swapchain image views before swapchain images created")
+	}
+
+	swapchain_image_views = make([]vk.ImageView, len(swapchain_images))
+
+	for i in 0 ..< len(swapchain_images) {
+		image_view_create_info := vk.ImageViewCreateInfo {
+			sType = .IMAGE_VIEW_CREATE_INFO,
+			image = swapchain_images[i],
+			viewType = vk.ImageViewType.D2,
+			format = swapchain_format.format,
+			components = {r = .IDENTITY, g = .IDENTITY, b = .IDENTITY, a = .IDENTITY},
+			subresourceRange = {
+				aspectMask = {.COLOR},
+				baseMipLevel = 0,
+				levelCount = 1,
+				baseArrayLayer = 0,
+				layerCount = 1,
+			},
+		}
+		if res := vk.CreateImageView(
+			device,
+			&image_view_create_info,
+			nil,
+			&swapchain_image_views[i],
+		); res != vk.Result.SUCCESS {
+			return false
+		}
+	}
+	return true
+}

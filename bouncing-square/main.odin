@@ -22,9 +22,10 @@ State :: struct {
 	surface:                         vk.SurfaceKHR,
 	surface_capabilities:            vk.SurfaceCapabilitiesKHR,
 	swapchain:                       vk.SwapchainKHR,
-	swapchain_extent:                          vk.Extent2D,
-	swapchain_format:                  vk.SurfaceFormatKHR,
+	swapchain_extent:                vk.Extent2D,
+	swapchain_format:                vk.SurfaceFormatKHR,
 	swapchain_image_count:           u32,
+	swapchain_image_views:           []vk.ImageView,
 	swapchain_images:                []vk.Image,
 	window:                          glfw.WindowHandle,
 }
@@ -88,13 +89,22 @@ main :: proc() {
 	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
 
 	get_swapchain_images(&state)
-  defer delete(state.swapchain_images)
+	defer delete(state.swapchain_images)
+
+	if !create_swapchain_image_views(&state) {
+		panic("create swapchain image views failed")
+	}
+	defer {
+		for image_view in state.swapchain_image_views {
+			vk.DestroyImageView(state.device, image_view, nil)
+		}
+		delete(state.swapchain_image_views)
+	}
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
 	}
 
-	// create swap chain (including its image views)
 	// create graphics pipeline (including its framebuffers wrapping needed image views)
 	// create command pool and command buffer
 	// synchronise host and gpu actions and present frame when it is ready
