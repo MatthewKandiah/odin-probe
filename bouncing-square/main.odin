@@ -5,6 +5,7 @@ package main
 
 import "base:runtime"
 import "core:fmt"
+import "core:os"
 import "vendor:glfw"
 import vk "vendor:vulkan"
 
@@ -32,6 +33,15 @@ State :: struct {
 
 main :: proc() {
 	state: State
+
+  vertex_shader_code, vert_shader_read_ok := os.read_entire_file("vert.spv")
+  if !vert_shader_read_ok {
+    panic("read vertex shader code failed")
+  }
+  fragment_shader_code, frag_shader_read_ok := os.read_entire_file("frag.spv")
+  if !frag_shader_read_ok {
+    panic("read fragment shader code failed")
+  }
 
 	if !glfw.Init() {
 		panic("glfwInit failed")
@@ -109,3 +119,4 @@ main :: proc() {
 	// create command pool and command buffer
 	// synchronise host and gpu actions and present frame when it is ready
 }
+
