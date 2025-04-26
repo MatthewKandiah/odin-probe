@@ -497,6 +497,12 @@ create_graphics_pipeline :: proc(using state: ^State) -> (success: bool) {
 		vertexAttributeDescriptionCount = 0,
 	}
 
+	input_assembly_state_create_info := vk.PipelineInputAssemblyStateCreateInfo {
+		sType                  = .PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		topology               = .TRIANGLE_LIST,
+		primitiveRestartEnable = false,
+	}
+
 	viewport := vk.Viewport {
 		x        = 0,
 		y        = 0,
@@ -585,6 +591,34 @@ create_graphics_pipeline :: proc(using state: ^State) -> (success: bool) {
 
 	if res := vk.CreateRenderPass(device, &render_pass_create_info, nil, &render_pass);
 	   res != vk.Result.SUCCESS {
+		return false
+	}
+
+	graphics_pipeline_create_info := vk.GraphicsPipelineCreateInfo {
+		sType               = .GRAPHICS_PIPELINE_CREATE_INFO,
+		stageCount          = 2,
+		pStages             = raw_data(shader_stage_create_infos),
+		pVertexInputState   = &vertex_input_state_create_info,
+		pInputAssemblyState = &input_assembly_state_create_info,
+		pViewportState      = &pipeline_viewport_state_create_info,
+		pRasterizationState = &pipeline_rasterization_state_create_info,
+		pMultisampleState   = &pipeline_multisample_state_create_info,
+		pDepthStencilState  = nil,
+		pColorBlendState    = &pipeline_color_blend_state_create_info,
+		pDynamicState       = &dynamic_state_create_info,
+		layout              = pipeline_layout,
+		renderPass          = render_pass,
+		subpass             = 0,
+	}
+
+	if res := vk.CreateGraphicsPipelines(
+		device,
+		0,
+		1,
+		&graphics_pipeline_create_info,
+		nil,
+		&graphics_pipeline,
+	); res != .SUCCESS {
 		return false
 	}
 

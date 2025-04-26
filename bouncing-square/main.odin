@@ -121,6 +121,7 @@ main :: proc() {
 	state.shader_module_vertex = 0
 	state.shader_module_fragment = 0
 	defer {
+		vk.DestroyPipeline(state.device, state.graphics_pipeline, nil)
 		vk.DestroyPipelineLayout(state.device, state.pipeline_layout, nil)
 		vk.DestroyRenderPass(state.device, state.render_pass, nil)
 	}
