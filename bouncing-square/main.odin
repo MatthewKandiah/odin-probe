@@ -168,5 +168,5 @@ main :: proc() {
 		draw_frame(&state)
 	}
 
-	// synchronise host and gpu actions and present frame when it is ready
+  vk.DeviceWaitIdle(state.device)
 }
