@@ -649,3 +649,18 @@ create_framebuffers :: proc(using state: ^State) -> (success: bool) {
 	}
 	return true
 }
+
+create_command_pool :: proc(using state: ^State) -> (success: bool) {
+	command_pool_create_info := vk.CommandPoolCreateInfo {
+		sType            = .COMMAND_POOL_CREATE_INFO,
+		flags            = {.RESET_COMMAND_BUFFER},
+		queueFamilyIndex = graphics_queue_family_index,
+	}
+
+	if res := vk.CreateCommandPool(device, &command_pool_create_info, nil, &command_pool);
+	   res != .SUCCESS {
+		return false
+	}
+
+	return true
+}

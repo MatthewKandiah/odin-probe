@@ -10,6 +10,7 @@ import "vendor:glfw"
 import vk "vendor:vulkan"
 
 State :: struct {
+	command_pool:                    vk.CommandPool,
 	device:                          vk.Device,
 	graphics_pipeline:               vk.Pipeline,
 	graphics_queue:                  vk.Queue,
@@ -135,6 +136,13 @@ main :: proc() {
 			vk.DestroyFramebuffer(state.device, framebuffer, nil)
 		}
 		delete(state.swapchain_framebuffers)
+	}
+
+	if !create_command_pool(&state) {
+		panic("create command pool failed")
+	}
+	defer {
+		vk.DestroyCommandPool(state.device, state.command_pool, nil)
 	}
 
 	for !glfw.WindowShouldClose(state.window) {
