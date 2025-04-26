@@ -35,6 +35,7 @@ State :: struct {
 	swapchain_image_views:           []vk.ImageView,
 	swapchain_images:                []vk.Image,
 	window:                          glfw.WindowHandle,
+	render_pass:                     vk.RenderPass,
 }
 
 main :: proc() {
@@ -119,7 +120,10 @@ main :: proc() {
 	vk.DestroyShaderModule(state.device, state.shader_module_fragment, nil)
 	state.shader_module_vertex = 0
 	state.shader_module_fragment = 0
-	defer vk.DestroyPipelineLayout(state.device, state.pipeline_layout, nil)
+	defer {
+		vk.DestroyPipelineLayout(state.device, state.pipeline_layout, nil)
+		vk.DestroyRenderPass(state.device, state.render_pass, nil)
+	}
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()

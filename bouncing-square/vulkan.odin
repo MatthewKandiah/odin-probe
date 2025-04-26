@@ -546,12 +546,47 @@ create_graphics_pipeline :: proc(using state: ^State) -> (success: bool) {
 		pAttachments    = &pipeline_color_blend_attachment_state,
 	}
 
-  pipeline_layout_create_info := vk.PipelineLayoutCreateInfo {
-    sType = .PIPELINE_LAYOUT_CREATE_INFO,
-  }
-  if res := vk.CreatePipelineLayout(device, &pipeline_layout_create_info, nil, &pipeline_layout); res != vk.Result.SUCCESS {
-    return false
-  }
+	pipeline_layout_create_info := vk.PipelineLayoutCreateInfo {
+		sType = .PIPELINE_LAYOUT_CREATE_INFO,
+	}
+	if res := vk.CreatePipelineLayout(device, &pipeline_layout_create_info, nil, &pipeline_layout);
+	   res != vk.Result.SUCCESS {
+		return false
+	}
+
+	color_attachment_description := vk.AttachmentDescription {
+		format         = swapchain_format.format,
+		samples        = {._1},
+		loadOp         = .CLEAR,
+		storeOp        = .STORE,
+		stencilLoadOp  = .DONT_CARE,
+		stencilStoreOp = .DONT_CARE,
+		initialLayout  = .UNDEFINED,
+		finalLayout    = .PRESENT_SRC_KHR,
+	}
+
+	color_attachment_ref := vk.AttachmentReference {
+		attachment = 0, // this matches the (location = 0) in our fragment shader output
+		layout     = .COLOR_ATTACHMENT_OPTIMAL,
+	}
+
+	subpass_description := vk.SubpassDescription {
+		colorAttachmentCount = 1,
+		pColorAttachments    = &color_attachment_ref,
+	}
+
+	render_pass_create_info := vk.RenderPassCreateInfo {
+		sType           = .RENDER_PASS_CREATE_INFO,
+		attachmentCount = 1,
+		pAttachments    = &color_attachment_description,
+		subpassCount    = 1,
+		pSubpasses      = &subpass_description,
+	}
+
+	if res := vk.CreateRenderPass(device, &render_pass_create_info, nil, &render_pass);
+	   res != vk.Result.SUCCESS {
+		return false
+	}
 
 	return true
 }
