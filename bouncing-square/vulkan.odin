@@ -794,13 +794,14 @@ draw_frame :: proc(using state: ^State) {
 
 	wait_stages := []vk.PipelineStageFlags{{.COLOR_ATTACHMENT_OUTPUT}}
 	submit_info := vk.SubmitInfo {
-		sType              = .SUBMIT_INFO,
-		waitSemaphoreCount = 1,
-		pWaitSemaphores    = &sync_semaphore_image_available,
-		pWaitDstStageMask  = raw_data(wait_stages),
-		commandBufferCount = 1,
-		pCommandBuffers    = &command_buffer,
-		pSignalSemaphores  = &sync_semaphore_render_finished,
+		sType                = .SUBMIT_INFO,
+		waitSemaphoreCount   = 1,
+		pWaitSemaphores      = &sync_semaphore_image_available,
+		pWaitDstStageMask    = raw_data(wait_stages),
+		commandBufferCount   = 1,
+		pCommandBuffers      = &command_buffer,
+		signalSemaphoreCount = 1,
+		pSignalSemaphores    = &sync_semaphore_render_finished,
 	}
 
 	if res := vk.QueueSubmit(graphics_queue, 1, &submit_info, sync_fence_in_flight);
@@ -819,6 +820,4 @@ draw_frame :: proc(using state: ^State) {
 	if res := vk.QueuePresentKHR(present_queue, &present_info); res != .SUCCESS {
 		panic("failed to present swapchain image")
 	}
-
-	// bugger - expected to see a triangle, instead got warning about waiting on a semaphore that can never be triggered
 }
