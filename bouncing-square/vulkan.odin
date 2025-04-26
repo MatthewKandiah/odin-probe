@@ -464,3 +464,94 @@ create_shader_modules :: proc(using state: ^State) -> (success: bool) {
 
 	return true
 }
+
+create_graphics_pipeline :: proc(using state: ^State) -> (success: bool) {
+	vertex_shader_stage_create_info := vk.PipelineShaderStageCreateInfo {
+		sType  = .PIPELINE_SHADER_STAGE_CREATE_INFO,
+		stage  = {.VERTEX},
+		module = shader_module_vertex,
+		pName  = "main",
+	}
+	fragment_shader_stage_create_info := vk.PipelineShaderStageCreateInfo {
+		sType  = .PIPELINE_SHADER_STAGE_CREATE_INFO,
+		stage  = {.FRAGMENT},
+		module = shader_module_fragment,
+		pName  = "main",
+	}
+	shader_stage_create_infos := []vk.PipelineShaderStageCreateInfo {
+		vertex_shader_stage_create_info,
+		fragment_shader_stage_create_info,
+	}
+
+	dynamic_states := []vk.DynamicState{.VIEWPORT, .SCISSOR}
+	dynamic_state_create_info := vk.PipelineDynamicStateCreateInfo {
+		sType             = .PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		dynamicStateCount = cast(u32)len(dynamic_states),
+		pDynamicStates    = raw_data(dynamic_states),
+	}
+
+	// inputs are hardcoded so we specify that there is no data to load
+	vertex_input_state_create_info := vk.PipelineVertexInputStateCreateInfo {
+		sType                           = .PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		vertexBindingDescriptionCount   = 0,
+		vertexAttributeDescriptionCount = 0,
+	}
+
+	viewport := vk.Viewport {
+		x        = 0,
+		y        = 0,
+		width    = cast(f32)swapchain_extent.width,
+		height   = cast(f32)swapchain_extent.height,
+		minDepth = 0,
+		maxDepth = 1,
+	}
+
+	scissor := vk.Rect2D {
+		offset = {0, 0},
+		extent = swapchain_extent,
+	}
+
+	pipeline_viewport_state_create_info := vk.PipelineViewportStateCreateInfo {
+		sType         = .PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		viewportCount = 1,
+		scissorCount  = 1,
+	}
+
+	pipeline_rasterization_state_create_info := vk.PipelineRasterizationStateCreateInfo {
+		sType                   = .PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		depthClampEnable        = false,
+		rasterizerDiscardEnable = false,
+		polygonMode             = .FILL,
+		lineWidth               = 1,
+		cullMode                = {.BACK},
+		frontFace               = .CLOCKWISE,
+		depthBiasEnable         = false,
+	}
+
+	pipeline_multisample_state_create_info := vk.PipelineMultisampleStateCreateInfo {
+		sType                = .PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		sampleShadingEnable  = false,
+		rasterizationSamples = {._1},
+	}
+
+	pipeline_color_blend_attachment_state := vk.PipelineColorBlendAttachmentState {
+		colorWriteMask = {.R, .G, .B, .A},
+		blendEnable    = false,
+	}
+
+	pipeline_color_blend_state_create_info := vk.PipelineColorBlendStateCreateInfo {
+		sType           = .PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		logicOpEnable   = false,
+		attachmentCount = 1,
+		pAttachments    = &pipeline_color_blend_attachment_state,
+	}
+
+  pipeline_layout_create_info := vk.PipelineLayoutCreateInfo {
+    sType = .PIPELINE_LAYOUT_CREATE_INFO,
+  }
+  if res := vk.CreatePipelineLayout(device, &pipeline_layout_create_info, nil, &pipeline_layout); res != vk.Result.SUCCESS {
+    return false
+  }
+
+	return true
+}

@@ -11,17 +11,19 @@ import vk "vendor:vulkan"
 
 State :: struct {
 	device:                          vk.Device,
+	graphics_pipeline:               vk.Pipeline,
 	graphics_queue:                  vk.Queue,
 	graphics_queue_family_index:     u32,
 	instance:                        vk.Instance,
 	physical_device:                 vk.PhysicalDevice,
+	pipeline_layout:                 vk.PipelineLayout,
 	present_mode:                    vk.PresentModeKHR,
 	present_queue:                   vk.Queue,
 	present_queue_family_index:      u32,
-	shader_code_vertex:              []byte,
 	shader_code_fragment:            []byte,
-	shader_module_vertex:            vk.ShaderModule,
+	shader_code_vertex:              []byte,
 	shader_module_fragment:          vk.ShaderModule,
+	shader_module_vertex:            vk.ShaderModule,
 	supported_surface_formats:       []vk.SurfaceFormatKHR,
 	supported_surface_present_modes: []vk.PresentModeKHR,
 	surface:                         vk.SurfaceKHR,
@@ -110,9 +112,14 @@ main :: proc() {
 		panic("create shader modules failed")
 	}
 
-	// create graphics pipeline here - shader modules can be freed after the graphics pipeline has ingested them
+	if !create_graphics_pipeline(&state) {
+		panic("create graphics pipeline failed")
+	}
 	vk.DestroyShaderModule(state.device, state.shader_module_vertex, nil)
 	vk.DestroyShaderModule(state.device, state.shader_module_fragment, nil)
+	state.shader_module_vertex = 0
+	state.shader_module_fragment = 0
+	defer vk.DestroyPipelineLayout(state.device, state.pipeline_layout, nil)
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
