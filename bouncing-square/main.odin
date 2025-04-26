@@ -3,6 +3,7 @@
 */
 // TODO-Matt: didn't like my error handling, mix of returning bool and panicking
 //            have flattened everything down, now want to simplify State if possible and pull out any repeated behaviour that would be useful for reuse before building further
+//            would be nice to wrap clunky Vulkan API calls that require an enumeration call then a real call in functions that just return the needed value
 package main
 
 import "base:runtime"
