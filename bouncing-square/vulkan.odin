@@ -581,12 +581,23 @@ create_graphics_pipeline :: proc(using state: ^State) -> (success: bool) {
 		pColorAttachments    = &color_attachment_ref,
 	}
 
+	subpass_dependency := vk.SubpassDependency {
+		srcSubpass    = vk.SUBPASS_EXTERNAL,
+		dstSubpass    = 0,
+		srcStageMask  = {.COLOR_ATTACHMENT_OUTPUT},
+		srcAccessMask = {},
+		dstStageMask  = {.COLOR_ATTACHMENT_OUTPUT},
+		dstAccessMask = {.COLOR_ATTACHMENT_WRITE},
+	}
+
 	render_pass_create_info := vk.RenderPassCreateInfo {
 		sType           = .RENDER_PASS_CREATE_INFO,
 		attachmentCount = 1,
 		pAttachments    = &color_attachment_description,
 		subpassCount    = 1,
 		pSubpasses      = &subpass_description,
+		dependencyCount = 1,
+		pDependencies   = &subpass_dependency,
 	}
 
 	if res := vk.CreateRenderPass(device, &render_pass_create_info, nil, &render_pass);
@@ -734,25 +745,80 @@ create_sync_objects :: proc(using state: ^State) -> (success: bool) {
 	semaphore_create_info := vk.SemaphoreCreateInfo {
 		sType = .SEMAPHORE_CREATE_INFO,
 	}
-  fence_create_info := vk.FenceCreateInfo {
-    sType = .FENCE_CREATE_INFO,
-  }
+	fence_create_info := vk.FenceCreateInfo {
+		sType = .FENCE_CREATE_INFO,
+		flags = {.SIGNALED},
+	}
 
-  if res := vk.CreateSemaphore(device, &semaphore_create_info, nil, &sync_semaphore_image_available); res != .SUCCESS {
-    return false
-  }
+	if res := vk.CreateSemaphore(
+		device,
+		&semaphore_create_info,
+		nil,
+		&sync_semaphore_image_available,
+	); res != .SUCCESS {
+		return false
+	}
 
-  if res := vk.CreateSemaphore(device, &semaphore_create_info, nil, &sync_semaphore_render_finished); res != .SUCCESS {
-    return false
-  }
+	if res := vk.CreateSemaphore(
+		device,
+		&semaphore_create_info,
+		nil,
+		&sync_semaphore_render_finished,
+	); res != .SUCCESS {
+		return false
+	}
 
-  if res := vk.CreateFence(device, &fence_create_info, nil, &sync_fence_in_flight); res != .SUCCESS {
-    return false
-  }
+	if res := vk.CreateFence(device, &fence_create_info, nil, &sync_fence_in_flight);
+	   res != .SUCCESS {
+		return false
+	}
 
 	return true
 }
 
 draw_frame :: proc(using state: ^State) {
-	// TODO - requires sync objects
+	vk.WaitForFences(device, 1, &sync_fence_in_flight, true, max(u64))
+	vk.ResetFences(device, 1, &sync_fence_in_flight)
+
+	vk.AcquireNextImageKHR(
+		device,
+		swapchain,
+		max(u64),
+		sync_semaphore_image_available,
+		0,
+		&swapchain_image_index,
+	)
+
+	vk.ResetCommandBuffer(command_buffer, {})
+	record_command_buffer(state)
+
+	wait_stages := []vk.PipelineStageFlags{{.COLOR_ATTACHMENT_OUTPUT}}
+	submit_info := vk.SubmitInfo {
+		sType              = .SUBMIT_INFO,
+		waitSemaphoreCount = 1,
+		pWaitSemaphores    = &sync_semaphore_image_available,
+		pWaitDstStageMask  = raw_data(wait_stages),
+		commandBufferCount = 1,
+		pCommandBuffers    = &command_buffer,
+		pSignalSemaphores  = &sync_semaphore_render_finished,
+	}
+
+	if res := vk.QueueSubmit(graphics_queue, 1, &submit_info, sync_fence_in_flight);
+	   res != .SUCCESS {
+		panic("failed to submit draw command buffer")
+	}
+
+	present_info := vk.PresentInfoKHR {
+		sType              = .PRESENT_INFO_KHR,
+		waitSemaphoreCount = 1,
+		pWaitSemaphores    = &sync_semaphore_render_finished,
+		swapchainCount     = 1,
+		pSwapchains        = &swapchain,
+		pImageIndices      = &swapchain_image_index,
+	}
+  if res := vk.QueuePresentKHR(present_queue, &present_info); res != .SUCCESS {
+    panic("failed to present swapchain image")
+  }
+
+  // bugger - expected to see a triangle, instead got warning about waiting on a semaphore that can never be triggered
 }
