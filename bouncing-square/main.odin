@@ -141,7 +141,6 @@ main :: proc() {
 		glfw.PollEvents()
 	}
 
-	// create graphics pipeline (including its framebuffers wrapping needed image views)
 	// create command pool and command buffer
 	// synchronise host and gpu actions and present frame when it is ready
 }
