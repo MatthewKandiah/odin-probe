@@ -18,6 +18,10 @@ State :: struct {
 	present_mode:                    vk.PresentModeKHR,
 	present_queue:                   vk.Queue,
 	present_queue_family_index:      u32,
+	shader_code_vertex:              []byte,
+	shader_code_fragment:            []byte,
+	shader_module_vertex:            vk.ShaderModule,
+	shader_module_fragment:          vk.ShaderModule,
 	supported_surface_formats:       []vk.SurfaceFormatKHR,
 	supported_surface_present_modes: []vk.PresentModeKHR,
 	surface:                         vk.SurfaceKHR,
@@ -33,15 +37,6 @@ State :: struct {
 
 main :: proc() {
 	state: State
-
-  vertex_shader_code, vert_shader_read_ok := os.read_entire_file("vert.spv")
-  if !vert_shader_read_ok {
-    panic("read vertex shader code failed")
-  }
-  fragment_shader_code, frag_shader_read_ok := os.read_entire_file("frag.spv")
-  if !frag_shader_read_ok {
-    panic("read fragment shader code failed")
-  }
 
 	if !glfw.Init() {
 		panic("glfwInit failed")
@@ -111,6 +106,14 @@ main :: proc() {
 		delete(state.swapchain_image_views)
 	}
 
+	if !create_shader_modules(&state) {
+		panic("create shader modules failed")
+	}
+
+	// create graphics pipeline here - shader modules can be freed after the graphics pipeline has ingested them
+	vk.DestroyShaderModule(state.device, state.shader_module_vertex, nil)
+	vk.DestroyShaderModule(state.device, state.shader_module_fragment, nil)
+
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
 	}
@@ -119,4 +122,3 @@ main :: proc() {
 	// create command pool and command buffer
 	// synchronise host and gpu actions and present frame when it is ready
 }
-

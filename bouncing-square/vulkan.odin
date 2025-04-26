@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:os"
 import "core:strings"
 import "vendor:glfw"
 import vk "vendor:vulkan"
@@ -421,5 +422,45 @@ create_swapchain_image_views :: proc(using state: ^State) -> (success: bool) {
 			return false
 		}
 	}
+	return true
+}
+
+load_shader_code :: proc(state: ^State) {
+	shader_code_vertex, vert_shader_read_ok := os.read_entire_file("vert.spv")
+	if !vert_shader_read_ok {
+		panic("read vertex shader code failed")
+	}
+	shader_code_fragment, frag_shader_read_ok := os.read_entire_file("frag.spv")
+	if !frag_shader_read_ok {
+		panic("read fragment shader code failed")
+	}
+	state.shader_code_vertex = shader_code_vertex
+	state.shader_code_fragment = shader_code_fragment
+}
+
+create_shader_modules :: proc(using state: ^State) -> (success: bool) {
+	load_shader_code(state)
+	create_info_vertex := vk.ShaderModuleCreateInfo {
+		sType    = .SHADER_MODULE_CREATE_INFO,
+		pCode    = cast(^u32)raw_data(shader_code_vertex),
+		codeSize = len(shader_code_vertex),
+	}
+	create_info_fragment := vk.ShaderModuleCreateInfo {
+		sType    = .SHADER_MODULE_CREATE_INFO,
+		pCode    = cast(^u32)raw_data(shader_code_fragment),
+		codeSize = len(shader_code_fragment),
+	}
+
+	res: vk.Result
+	if res = vk.CreateShaderModule(device, &create_info_vertex, nil, &shader_module_vertex);
+	   res != vk.Result.SUCCESS {
+		return false
+	}
+
+	if res = vk.CreateShaderModule(device, &create_info_fragment, nil, &shader_module_fragment);
+	   res != vk.Result.SUCCESS {
+		return false
+	}
+
 	return true
 }
