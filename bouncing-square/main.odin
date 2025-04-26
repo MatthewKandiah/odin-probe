@@ -10,6 +10,7 @@ import "vendor:glfw"
 import vk "vendor:vulkan"
 
 State :: struct {
+	command_buffer:                  vk.CommandBuffer,
 	command_pool:                    vk.CommandPool,
 	device:                          vk.Device,
 	graphics_pipeline:               vk.Pipeline,
@@ -35,8 +36,12 @@ State :: struct {
 	swapchain_format:                vk.SurfaceFormatKHR,
 	swapchain_framebuffers:          []vk.Framebuffer,
 	swapchain_image_count:           u32,
+	swapchain_image_index:           u32,
 	swapchain_image_views:           []vk.ImageView,
 	swapchain_images:                []vk.Image,
+	sync_fence_in_flight:            vk.Fence,
+	sync_semaphore_image_available:  vk.Semaphore,
+	sync_semaphore_render_finished:  vk.Semaphore,
 	window:                          glfw.WindowHandle,
 }
 
@@ -145,10 +150,23 @@ main :: proc() {
 		vk.DestroyCommandPool(state.device, state.command_pool, nil)
 	}
 
-	for !glfw.WindowShouldClose(state.window) {
-		glfw.PollEvents()
+	if !create_command_buffer(&state) {
+		panic("create command buffer failed")
 	}
 
-	// create command pool and command buffer
+  if !create_sync_objects(&state) {
+    panic("create sync objects failed")
+  }
+  defer{
+    vk.DestroySemaphore(state.device, state.sync_semaphore_image_available, nil)
+    vk.DestroySemaphore(state.device, state.sync_semaphore_render_finished, nil)
+    vk.DestroyFence(state.device, state.sync_fence_in_flight, nil)
+}
+
+	for !glfw.WindowShouldClose(state.window) {
+		glfw.PollEvents()
+		draw_frame(&state)
+	}
+
 	// synchronise host and gpu actions and present frame when it is ready
 }

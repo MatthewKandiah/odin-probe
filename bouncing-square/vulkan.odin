@@ -664,3 +664,95 @@ create_command_pool :: proc(using state: ^State) -> (success: bool) {
 
 	return true
 }
+
+create_command_buffer :: proc(using state: ^State) -> (success: bool) {
+	command_buffer_allocate_info := vk.CommandBufferAllocateInfo {
+		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
+		commandPool        = command_pool,
+		level              = .PRIMARY,
+		commandBufferCount = 1,
+	}
+
+	if res := vk.AllocateCommandBuffers(device, &command_buffer_allocate_info, &command_buffer);
+	   res != .SUCCESS {
+		return false
+	}
+
+	return true
+}
+
+record_command_buffer :: proc(using state: ^State) {
+	command_buffer_begin_info := vk.CommandBufferBeginInfo {
+		sType = .COMMAND_BUFFER_BEGIN_INFO,
+	}
+
+	if res := vk.BeginCommandBuffer(command_buffer, &command_buffer_begin_info); res != .SUCCESS {
+		panic("failed to begin recording command buffer")
+	}
+
+	clear_colour := vk.ClearValue {
+		color = {float32 = {0, 0, 0, 1}},
+	}
+	render_pass_begin_info := vk.RenderPassBeginInfo {
+		sType = .RENDER_PASS_BEGIN_INFO,
+		renderPass = render_pass,
+		framebuffer = swapchain_framebuffers[swapchain_image_index],
+		renderArea = vk.Rect2D{offset = {0, 0}, extent = swapchain_extent},
+		clearValueCount = 1,
+		pClearValues = &clear_colour,
+	}
+	vk.CmdBeginRenderPass(command_buffer, &render_pass_begin_info, .INLINE)
+
+	vk.CmdBindPipeline(command_buffer, .GRAPHICS, graphics_pipeline)
+
+	viewport := vk.Viewport {
+		x        = 0,
+		y        = 0,
+		width    = cast(f32)swapchain_extent.width,
+		height   = cast(f32)swapchain_extent.height,
+		minDepth = 0,
+		maxDepth = 1,
+	}
+	vk.CmdSetViewport(command_buffer, 0, 1, &viewport)
+
+	scissor := vk.Rect2D {
+		offset = {0, 0},
+		extent = swapchain_extent,
+	}
+	vk.CmdSetScissor(command_buffer, 0, 1, &scissor)
+
+	vk.CmdDraw(command_buffer, 3, 1, 0, 0)
+
+	vk.CmdEndRenderPass(command_buffer)
+
+	if res := vk.EndCommandBuffer(command_buffer); res != .SUCCESS {
+		panic("failed to record command buffer")
+	}
+}
+
+create_sync_objects :: proc(using state: ^State) -> (success: bool) {
+	semaphore_create_info := vk.SemaphoreCreateInfo {
+		sType = .SEMAPHORE_CREATE_INFO,
+	}
+  fence_create_info := vk.FenceCreateInfo {
+    sType = .FENCE_CREATE_INFO,
+  }
+
+  if res := vk.CreateSemaphore(device, &semaphore_create_info, nil, &sync_semaphore_image_available); res != .SUCCESS {
+    return false
+  }
+
+  if res := vk.CreateSemaphore(device, &semaphore_create_info, nil, &sync_semaphore_render_finished); res != .SUCCESS {
+    return false
+  }
+
+  if res := vk.CreateFence(device, &fence_create_info, nil, &sync_fence_in_flight); res != .SUCCESS {
+    return false
+  }
+
+	return true
+}
+
+draw_frame :: proc(using state: ^State) {
+	// TODO - requires sync objects
+}
