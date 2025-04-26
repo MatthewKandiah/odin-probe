@@ -154,14 +154,14 @@ main :: proc() {
 		panic("create command buffer failed")
 	}
 
-  if !create_sync_objects(&state) {
-    panic("create sync objects failed")
-  }
-  defer{
-    vk.DestroySemaphore(state.device, state.sync_semaphore_image_available, nil)
-    vk.DestroySemaphore(state.device, state.sync_semaphore_render_finished, nil)
-    vk.DestroyFence(state.device, state.sync_fence_in_flight, nil)
-}
+	if !create_sync_objects(&state) {
+		panic("create sync objects failed")
+	}
+	defer {
+		vk.DestroySemaphore(state.device, state.sync_semaphore_image_available, nil)
+		vk.DestroySemaphore(state.device, state.sync_semaphore_render_finished, nil)
+		vk.DestroyFence(state.device, state.sync_fence_in_flight, nil)
+	}
 
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
