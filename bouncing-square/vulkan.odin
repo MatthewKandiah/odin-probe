@@ -624,3 +624,28 @@ create_graphics_pipeline :: proc(using state: ^State) -> (success: bool) {
 
 	return true
 }
+
+create_framebuffers :: proc(using state: ^State) -> (success: bool) {
+	swapchain_framebuffers = make([]vk.Framebuffer, len(swapchain_image_views))
+	for i in 0 ..< len(swapchain_image_views) {
+		framebuffer_create_info := vk.FramebufferCreateInfo {
+			sType           = .FRAMEBUFFER_CREATE_INFO,
+			renderPass      = render_pass,
+			attachmentCount = 1,
+			pAttachments    = &swapchain_image_views[i],
+			width           = swapchain_extent.width,
+			height          = swapchain_extent.height,
+			layers          = 1,
+		}
+
+		if res := vk.CreateFramebuffer(
+			device,
+			&framebuffer_create_info,
+			nil,
+			&swapchain_framebuffers[i],
+		); res != .SUCCESS {
+			return false
+		}
+	}
+	return true
+}

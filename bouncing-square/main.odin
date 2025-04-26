@@ -20,6 +20,7 @@ State :: struct {
 	present_mode:                    vk.PresentModeKHR,
 	present_queue:                   vk.Queue,
 	present_queue_family_index:      u32,
+	render_pass:                     vk.RenderPass,
 	shader_code_fragment:            []byte,
 	shader_code_vertex:              []byte,
 	shader_module_fragment:          vk.ShaderModule,
@@ -31,11 +32,11 @@ State :: struct {
 	swapchain:                       vk.SwapchainKHR,
 	swapchain_extent:                vk.Extent2D,
 	swapchain_format:                vk.SurfaceFormatKHR,
+	swapchain_framebuffers:          []vk.Framebuffer,
 	swapchain_image_count:           u32,
 	swapchain_image_views:           []vk.ImageView,
 	swapchain_images:                []vk.Image,
 	window:                          glfw.WindowHandle,
-	render_pass:                     vk.RenderPass,
 }
 
 main :: proc() {
@@ -124,6 +125,16 @@ main :: proc() {
 		vk.DestroyPipeline(state.device, state.graphics_pipeline, nil)
 		vk.DestroyPipelineLayout(state.device, state.pipeline_layout, nil)
 		vk.DestroyRenderPass(state.device, state.render_pass, nil)
+	}
+
+	if !create_framebuffers(&state) {
+		panic("create framebuffers failed")
+	}
+	defer {
+		for framebuffer in state.swapchain_framebuffers {
+			vk.DestroyFramebuffer(state.device, framebuffer, nil)
+		}
+		delete(state.swapchain_framebuffers)
 	}
 
 	for !glfw.WindowShouldClose(state.window) {
