@@ -816,9 +816,9 @@ draw_frame :: proc(using state: ^State) {
 		pSwapchains        = &swapchain,
 		pImageIndices      = &swapchain_image_index,
 	}
-  if res := vk.QueuePresentKHR(present_queue, &present_info); res != .SUCCESS {
-    panic("failed to present swapchain image")
-  }
+	if res := vk.QueuePresentKHR(present_queue, &present_info); res != .SUCCESS {
+		panic("failed to present swapchain image")
+	}
 
-  // bugger - expected to see a triangle, instead got warning about waiting on a semaphore that can never be triggered
+	// bugger - expected to see a triangle, instead got warning about waiting on a semaphore that can never be triggered
 }
