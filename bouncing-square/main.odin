@@ -190,18 +190,17 @@ main :: proc() {
 	if count == 0 {
 		panic("found no physical device surface formats")
 	}
-	formats := make([]vk.SurfaceFormatKHR, count)
+	supported_surface_formats := make([]vk.SurfaceFormatKHR, count)
 	if res := vk.GetPhysicalDeviceSurfaceFormatsKHR(
 		state.physical_device,
 		state.surface,
 		&count,
-		raw_data(formats),
+		raw_data(supported_surface_formats),
 	); res != vk.Result.SUCCESS {
 		panic("get physical device surface formats failed")
 	}
-	state.supported_surface_formats = formats
 	format_selected := false
-	for available_format in formats {
+	for available_format in supported_surface_formats {
 		// select preferred format if it's supported, else just take the first supported format
 		if available_format.format == vk.Format.B8G8R8A8_SRGB &&
 		   available_format.colorSpace == vk.ColorSpaceKHR.SRGB_NONLINEAR {
@@ -211,27 +210,26 @@ main :: proc() {
 		}
 	}
 	if !format_selected {
-		state.swapchain_format = formats[0]
+		state.swapchain_format = supported_surface_formats[0]
 	}
-	defer delete(state.supported_surface_formats)
+	delete(supported_surface_formats)
 
 	// get physical device surface present modes
 	vk.GetPhysicalDeviceSurfacePresentModesKHR(state.physical_device, state.surface, &count, nil)
 	if count == 0 {
 		panic("found no physical device surface present modes")
 	}
-	modes := make([]vk.PresentModeKHR, count)
+	supported_surface_present_modes := make([]vk.PresentModeKHR, count)
 	if res := vk.GetPhysicalDeviceSurfacePresentModesKHR(
 		state.physical_device,
 		state.surface,
 		&count,
-		raw_data(modes),
+		raw_data(supported_surface_present_modes),
 	); res != vk.Result.SUCCESS {
 		panic("get physical device surface present modes failed")
 	}
-	state.supported_surface_present_modes = modes
 	mode_selected := false
-	for available_mode in modes {
+	for available_mode in supported_surface_present_modes {
 		// select preferred present mode if it's supported, else just take FIFO because it's guaranteed to be supported
 		if available_mode == vk.PresentModeKHR.MAILBOX {
 			state.present_mode = available_mode
@@ -242,7 +240,7 @@ main :: proc() {
 	if !mode_selected {
 		state.present_mode = vk.PresentModeKHR.FIFO
 	}
-	defer delete(state.supported_surface_present_modes)
+	delete(supported_surface_present_modes)
 
 	// get surface extent
 	if res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -707,12 +705,8 @@ State :: struct {
 	present_queue:                   vk.Queue,
 	present_queue_family_index:      u32,
 	render_pass:                     vk.RenderPass,
-	shader_code_fragment:            []byte,
-	shader_code_vertex:              []byte,
 	shader_module_fragment:          vk.ShaderModule,
 	shader_module_vertex:            vk.ShaderModule,
-	supported_surface_formats:       []vk.SurfaceFormatKHR,
-	supported_surface_present_modes: []vk.PresentModeKHR,
 	surface:                         vk.SurfaceKHR,
 	surface_capabilities:            vk.SurfaceCapabilitiesKHR,
 	swapchain:                       vk.SwapchainKHR,
