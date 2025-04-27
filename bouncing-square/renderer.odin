@@ -2,6 +2,7 @@ package main
 
 import "base:runtime"
 import "core:fmt"
+import "core:math/linalg/glsl"
 import "core:os"
 import "vendor:glfw"
 import vk "vendor:vulkan"
@@ -9,6 +10,27 @@ import vk "vendor:vulkan"
 REQUIRED_LAYER_NAMES := []cstring{"VK_LAYER_KHRONOS_validation"}
 REQUIRED_EXTENSION_NAMES := []cstring{vk.KHR_SWAPCHAIN_EXTENSION_NAME}
 MAX_FRAMES_IN_FLIGHT :: 2
+
+Vertex :: struct {
+	pos:   glsl.vec2,
+	color: glsl.vec3,
+}
+
+vertex_input_binding_description := vk.VertexInputBindingDescription {
+	binding   = 0,
+	stride    = size_of(Vertex),
+	inputRate = .VERTEX,
+}
+
+vertex_input_attribute_descriptions := [2]vk.VertexInputAttributeDescription {
+	{binding = 0, location = 0, format = .R32G32_SFLOAT, offset = cast(u32)offset_of(Vertex, pos)},
+	{
+		binding = 0,
+		location = 1,
+		format = .R32G32B32_SFLOAT,
+		offset = cast(u32)offset_of(Vertex, color),
+	},
+}
 
 RendererState :: struct {
 	command_buffers:                 [MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer,
@@ -41,6 +63,8 @@ RendererState :: struct {
 	sync_semaphores_image_available: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
 	sync_semaphores_render_finished: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
 	window:                          glfw.WindowHandle,
+	vertex_buffer:                   vk.Buffer,
+	vertex_buffer_memory:            vk.DeviceMemory,
 }
 
 set_swapchain_extent :: proc(state: ^RendererState) {
@@ -258,6 +282,15 @@ record_command_buffer :: proc(using state: ^RendererState) {
 	}
 	vk.CmdBeginRenderPass(command_buffers[frame_index], &render_pass_begin_info, .INLINE)
 	vk.CmdBindPipeline(command_buffers[frame_index], .GRAPHICS, graphics_pipeline)
+	vertex_buffers := []vk.Buffer{vertex_buffer}
+	offsets := []vk.DeviceSize{0}
+	vk.CmdBindVertexBuffers(
+		command_buffers[frame_index],
+		0,
+		1,
+		raw_data(vertex_buffers),
+		raw_data(offsets),
+	)
 	viewport := vk.Viewport {
 		x        = 0,
 		y        = 0,
@@ -272,7 +305,13 @@ record_command_buffer :: proc(using state: ^RendererState) {
 		extent = swapchain_extent,
 	}
 	vk.CmdSetScissor(command_buffers[frame_index], 0, 1, &scissor)
-	vk.CmdDraw(command_buffers[frame_index], 3, 1, 0, 0)
+	vk.CmdDraw(
+		command_buffers[frame_index],
+		cast(u32)(size_of(vertices[0]) * len(vertices)),
+		1,
+		0,
+		0,
+	)
 	vk.CmdEndRenderPass(command_buffers[frame_index])
 	if res := vk.EndCommandBuffer(command_buffers[frame_index]); res != .SUCCESS {
 		panic("failed to record command buffer")
@@ -398,4 +437,20 @@ get_swapchain_images :: proc(device: vk.Device, swapchain: vk.SwapchainKHR) -> [
 	swapchain_images := make([]vk.Image, count)
 	vk.GetSwapchainImagesKHR(device, swapchain, &count, raw_data(swapchain_images))
 	return swapchain_images
+}
+
+find_memory_type :: proc(
+	state: ^RendererState,
+	type_filter: u32,
+	properties: vk.MemoryPropertyFlags,
+) -> u32 {
+	physical_device_memory_properties: vk.PhysicalDeviceMemoryProperties
+	vk.GetPhysicalDeviceMemoryProperties(state.physical_device, &physical_device_memory_properties)
+	for i in 0 ..< physical_device_memory_properties.memoryTypeCount {
+		if type_filter & (1 << i) != 0 &&
+		   physical_device_memory_properties.memoryTypes[i].propertyFlags >= properties {
+			return i
+		}
+	}
+	panic("failed to find suitable memory type")
 }

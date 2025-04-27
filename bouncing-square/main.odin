@@ -10,14 +10,18 @@
 */
 package main
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
+import "core:math/linalg/glsl"
 import "core:os"
 import "vendor:glfw"
 import vk "vendor:vulkan"
 
 WINDOW_WIDTH :: 800
 WINDOW_HEIGHT :: 600
+
+vertices :: []Vertex{{{0, -0.5}, {1, 0, 0}}, {{0.5, 0.5}, {0, 1, 0}}, {{-0.5, 0.5}, {0, 0, 1}}}
 
 main :: proc() {
 	state: RendererState
@@ -276,11 +280,12 @@ main :: proc() {
 		dynamicStateCount = cast(u32)len(dynamic_states),
 		pDynamicStates    = raw_data(dynamic_states),
 	}
-	// inputs are hardcoded so we specify that there is no data to load
 	vertex_input_state_create_info := vk.PipelineVertexInputStateCreateInfo {
 		sType                           = .PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		vertexBindingDescriptionCount   = 0,
-		vertexAttributeDescriptionCount = 0,
+		vertexBindingDescriptionCount   = 1,
+		pVertexBindingDescriptions      = &vertex_input_binding_description,
+		vertexAttributeDescriptionCount = len(vertex_input_attribute_descriptions),
+		pVertexAttributeDescriptions    = &vertex_input_attribute_descriptions[0],
 	}
 	input_assembly_state_create_info := vk.PipelineInputAssemblyStateCreateInfo {
 		sType                  = .PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -436,7 +441,60 @@ main :: proc() {
 		vk.DestroyCommandPool(state.device, state.command_pool, nil)
 	}
 
-	// create command buffer
+	// create vertex buffer, allocate memory for it, and bind buffer to memory
+	vertex_buffer_create_info := vk.BufferCreateInfo {
+		sType       = .BUFFER_CREATE_INFO,
+		size        = cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices)),
+		usage       = {.VERTEX_BUFFER},
+		sharingMode = .EXCLUSIVE,
+	}
+	if res := vk.CreateBuffer(state.device, &vertex_buffer_create_info, nil, &state.vertex_buffer);
+	   res != .SUCCESS {
+		panic("create vertex buffer failed")
+	}
+	defer {
+		vk.DestroyBuffer(state.device, state.vertex_buffer, nil)
+		vk.FreeMemory(state.device, state.vertex_buffer_memory, nil)
+	}
+	vertex_buffer_memory_requirements: vk.MemoryRequirements
+	vk.GetBufferMemoryRequirements(
+		state.device,
+		state.vertex_buffer,
+		&vertex_buffer_memory_requirements,
+	)
+	vertex_buffer_allocate_info := vk.MemoryAllocateInfo {
+		sType           = .MEMORY_ALLOCATE_INFO,
+		allocationSize  = vertex_buffer_memory_requirements.size,
+		memoryTypeIndex = find_memory_type(
+			&state,
+			vertex_buffer_memory_requirements.memoryTypeBits,
+			{.HOST_VISIBLE, .HOST_COHERENT},
+		),
+	}
+	if res := vk.AllocateMemory(
+		state.device,
+		&vertex_buffer_allocate_info,
+		nil,
+		&state.vertex_buffer_memory,
+	); res != .SUCCESS {
+		panic("failed to allocate vertex buffer memory")
+	}
+	vk.BindBufferMemory(state.device, state.vertex_buffer, state.vertex_buffer_memory, 0)
+
+	// fill the gpu vertex buffer with our vertex data
+	vertex_buffer_data: rawptr
+	vk.MapMemory(
+		state.device,
+		state.vertex_buffer_memory,
+		0,
+		vertex_buffer_create_info.size,
+		{},
+		&vertex_buffer_data,
+	)
+  intrinsics.mem_copy_non_overlapping(vertex_buffer_data, raw_data(vertices), vertex_buffer_create_info.size)
+	vk.UnmapMemory(state.device, state.vertex_buffer_memory)
+
+	// create command buffers
 	command_buffer_allocate_info := vk.CommandBufferAllocateInfo {
 		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
 		commandPool        = state.command_pool,
