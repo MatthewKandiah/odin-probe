@@ -12,6 +12,7 @@ RendererState :: struct {
 	command_buffers:                 [MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer,
 	command_pool:                    vk.CommandPool,
 	device:                          vk.Device,
+	frame_buffer_resized:            bool,
 	frame_index:                     u32,
 	graphics_pipeline:               vk.Pipeline,
 	graphics_queue:                  vk.Queue,
@@ -38,6 +39,36 @@ RendererState :: struct {
 	sync_semaphores_image_available: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
 	sync_semaphores_render_finished: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
 	window:                          glfw.WindowHandle,
+}
+
+set_swapchain_extent :: proc(state: ^RendererState) {
+	if res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(
+		state.physical_device,
+		state.surface,
+		&state.surface_capabilities,
+	); res != vk.Result.SUCCESS {
+		panic("get physical device surface capabilities failed")
+	}
+	// special value, indicates size will be determined by extent of a swapchain targeting the surface
+	if state.surface_capabilities.currentExtent.width == max(u32) {
+		width, height := glfw.GetFramebufferSize(state.window)
+		extent: vk.Extent2D = {
+			width  = clamp(
+				cast(u32)width,
+				state.surface_capabilities.minImageExtent.width,
+				state.surface_capabilities.maxImageExtent.width,
+			),
+			height = clamp(
+				cast(u32)height,
+				state.surface_capabilities.minImageExtent.height,
+				state.surface_capabilities.maxImageExtent.height,
+			),
+		}
+		state.swapchain_extent = extent
+	} else {
+		// default case, set swapchain extent to match the screens current extent
+		state.swapchain_extent = state.surface_capabilities.currentExtent
+	}
 }
 
 setup_new_swapchain :: proc(state: ^RendererState) {
@@ -131,8 +162,16 @@ clean_up_swapchain :: proc(state: ^RendererState) {
 }
 
 recreate_swapchain :: proc(state: ^RendererState) {
+	// handle minimization
+	width, height := glfw.GetFramebufferSize(state.window)
+	for width == 0 || height == 0 {
+		width, height = glfw.GetFramebufferSize(state.window)
+		glfw.WaitEvents()
+	}
+
 	vk.DeviceWaitIdle(state.device)
 	clean_up_swapchain(state)
+	set_swapchain_extent(state)
 	setup_new_swapchain(state)
 	setup_new_framebuffers(state)
 }
@@ -171,9 +210,7 @@ draw_frame :: proc(using state: ^RendererState) {
 		&submit_info,
 		sync_fences_in_flight[frame_index],
 	)
-	if queue_submit_res == .ERROR_OUT_OF_DATE_KHR || queue_submit_res == .SUBOPTIMAL_KHR {
-		recreate_swapchain(state)
-	} else if queue_submit_res != .SUCCESS {
+	if queue_submit_res != .SUCCESS {
 		panic("failed to submit draw command buffer")
 	}
 	present_info := vk.PresentInfoKHR {
@@ -184,7 +221,13 @@ draw_frame :: proc(using state: ^RendererState) {
 		pSwapchains        = &swapchain,
 		pImageIndices      = &swapchain_image_index,
 	}
-	if res := vk.QueuePresentKHR(present_queue, &present_info); res != .SUCCESS {
+	present_res := vk.QueuePresentKHR(present_queue, &present_info)
+	if present_res == .ERROR_OUT_OF_DATE_KHR ||
+	   present_res == .SUBOPTIMAL_KHR ||
+	   frame_buffer_resized {
+		frame_buffer_resized = false
+		recreate_swapchain(state)
+	} else if present_res != .SUCCESS {
 		panic("failed to present swapchain image")
 	}
 

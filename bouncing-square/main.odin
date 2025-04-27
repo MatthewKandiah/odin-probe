@@ -34,11 +34,18 @@ main :: proc() {
 
 	// create window
 	glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
-	glfw.WindowHint(glfw.RESIZABLE, glfw.FALSE)
-	window := glfw.CreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "bouncing ball", nil, nil)
-	if window == nil {panic("glfw create window failed")}
-	state.window = window
+	glfw.WindowHint(glfw.RESIZABLE, glfw.TRUE)
+	state.window = glfw.CreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "bouncing ball", nil, nil)
+	if state.window == nil {panic("glfw create window failed")}
 	defer glfw.DestroyWindow(state.window)
+
+	// handle window resizes
+	glfw.SetWindowUserPointer(state.window, &state)
+	framebuffer_resize_callback :: proc "c" (window: glfw.WindowHandle, width: i32, height: i32) {
+		state := cast(^RendererState)glfw.GetWindowUserPointer(window)
+		state.frame_buffer_resized = true
+	}
+	glfw.SetFramebufferSizeCallback(state.window, framebuffer_resize_callback)
 
 	// initialise Vulkan instance
 	context.user_ptr = &state
@@ -205,36 +212,8 @@ main :: proc() {
 	}
 	delete(supported_surface_present_modes)
 
-	// get surface extent
-	if res := vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(
-		state.physical_device,
-		state.surface,
-		&state.surface_capabilities,
-	); res != vk.Result.SUCCESS {
-		panic("get physical device surface capabilities failed")
-	}
-	// special value, indicates size will be determined by extent of a swapchain targeting the surface
-	if state.surface_capabilities.currentExtent.width == max(u32) {
-		width, height := glfw.GetFramebufferSize(state.window)
-		extent: vk.Extent2D = {
-			width  = clamp(
-				cast(u32)width,
-				state.surface_capabilities.minImageExtent.width,
-				state.surface_capabilities.maxImageExtent.width,
-			),
-			height = clamp(
-				cast(u32)height,
-				state.surface_capabilities.minImageExtent.height,
-				state.surface_capabilities.maxImageExtent.height,
-			),
-		}
-		state.swapchain_extent = extent
-	} else {
-		// default case, set swapchain extent to match the screens current extent
-		state.swapchain_extent = state.surface_capabilities.currentExtent
-	}
-
-  setup_new_swapchain(&state)
+	set_swapchain_extent(&state)
+	setup_new_swapchain(&state)
 
 	// create shader modules
 	shader_code_vertex, vert_shader_read_ok := os.read_entire_file("vert.spv")
@@ -434,8 +413,8 @@ main :: proc() {
 		vk.DestroyRenderPass(state.device, state.render_pass, nil)
 	}
 
-  setup_new_framebuffers(&state)
-  defer clean_up_swapchain(&state)
+	setup_new_framebuffers(&state)
+	defer clean_up_swapchain(&state)
 
 	// create command pool
 	command_pool_create_info := vk.CommandPoolCreateInfo {
