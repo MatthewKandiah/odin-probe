@@ -166,7 +166,7 @@ main :: proc() {
 	vk.GetDeviceQueue(state.device, state.present_queue_family_index, 0, &state.present_queue)
 	defer vk.DestroyDevice(state.device, nil)
 
-	// get physical device surface formats
+	// select physical device surface format
 	supported_surface_formats := get_physical_device_surface_formats(
 		state.physical_device,
 		state.surface,
@@ -186,7 +186,7 @@ main :: proc() {
 	}
 	delete(supported_surface_formats)
 
-	// get physical device surface present modes
+	// select physical device surface present mode
 	supported_surface_present_modes := get_physical_device_surface_present_modes(
 		state.physical_device,
 		state.surface,
@@ -251,7 +251,6 @@ main :: proc() {
 		clipped          = true,
 		preTransform     = state.surface_capabilities.currentTransform,
 	}
-
 	if res := vk.CreateSwapchainKHR(state.device, &swapchain_create_info, nil, &state.swapchain);
 	   res != vk.Result.SUCCESS {
 		panic("create swapchain failed")
