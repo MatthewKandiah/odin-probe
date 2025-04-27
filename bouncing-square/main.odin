@@ -12,8 +12,13 @@ import "core:os"
 import "vendor:glfw"
 import vk "vendor:vulkan"
 
+REQUIRED_LAYER_NAMES := []cstring{"VK_LAYER_KHRONOS_validation"}
+REQUIRED_EXTENSION_NAMES := []cstring{vk.KHR_SWAPCHAIN_EXTENSION_NAME}
+WINDOW_WIDTH :: 800
+WINDOW_HEIGHT :: 600
+
 main :: proc() {
-	state: State
+	state: RendererState
 
 	if !glfw.Init() {
 		panic("glfwInit failed")
@@ -38,7 +43,7 @@ main :: proc() {
 	// initialise Vulkan instance
 	context.user_ptr = &state
 	get_proc_address :: proc(p: rawptr, name: cstring) {
-		state := cast(^State)context.user_ptr
+		state := cast(^RendererState)context.user_ptr
 		(cast(^rawptr)p)^ = glfw.GetInstanceProcAddress(state.instance, name)
 	}
 	vk.load_proc_addresses(get_proc_address)
@@ -76,20 +81,7 @@ main :: proc() {
 	defer vk.DestroySurfaceKHR(state.instance, state.surface, nil)
 
 	// get physical device
-	physical_device_count: u32
-	vk.EnumeratePhysicalDevices(state.instance, &physical_device_count, nil)
-	if physical_device_count == 0 {
-		panic("failed to find a Vulkan compatible device")
-	}
-	physical_devices := make([]vk.PhysicalDevice, physical_device_count)
-	if vk.EnumeratePhysicalDevices(
-		   state.instance,
-		   &physical_device_count,
-		   raw_data(physical_devices),
-	   ) !=
-	   vk.Result.SUCCESS {
-		panic("enumerate physical devices failed")
-	}
+	physical_devices := get_physical_devices(state.instance)
 	for physical_device in physical_devices {
 		properties: vk.PhysicalDeviceProperties
 		if !check_extension_support(physical_device) {
@@ -109,18 +101,7 @@ main :: proc() {
 	delete(physical_devices)
 
 	// create logical device
-	queue_family_properties_count: u32
-	vk.GetPhysicalDeviceQueueFamilyProperties(
-		state.physical_device,
-		&queue_family_properties_count,
-		nil,
-	)
-	queue_family_properties := make([]vk.QueueFamilyProperties, queue_family_properties_count)
-	vk.GetPhysicalDeviceQueueFamilyProperties(
-		state.physical_device,
-		&queue_family_properties_count,
-		raw_data(queue_family_properties),
-	)
+	queue_family_properties := get_queue_family_properties(state.physical_device)
 	graphics_index_found: bool = false
 	present_index_found: bool = false
 	for i: u32 = 0; i < cast(u32)len(queue_family_properties); i += 1 {
@@ -180,26 +161,16 @@ main :: proc() {
 	   res != vk.Result.SUCCESS {
 		panic("create logical device failed")
 	}
-	// assumes we are only grabbing one queue per queue family
+	// we are only grabbing one queue per queue family
 	vk.GetDeviceQueue(state.device, state.graphics_queue_family_index, 0, &state.graphics_queue)
 	vk.GetDeviceQueue(state.device, state.present_queue_family_index, 0, &state.present_queue)
 	defer vk.DestroyDevice(state.device, nil)
 
 	// get physical device surface formats
-	count: u32
-	vk.GetPhysicalDeviceSurfaceFormatsKHR(state.physical_device, state.surface, &count, nil)
-	if count == 0 {
-		panic("found no physical device surface formats")
-	}
-	supported_surface_formats := make([]vk.SurfaceFormatKHR, count)
-	if res := vk.GetPhysicalDeviceSurfaceFormatsKHR(
+	supported_surface_formats := get_physical_device_surface_formats(
 		state.physical_device,
 		state.surface,
-		&count,
-		raw_data(supported_surface_formats),
-	); res != vk.Result.SUCCESS {
-		panic("get physical device surface formats failed")
-	}
+	)
 	format_selected := false
 	for available_format in supported_surface_formats {
 		// select preferred format if it's supported, else just take the first supported format
@@ -216,19 +187,7 @@ main :: proc() {
 	delete(supported_surface_formats)
 
 	// get physical device surface present modes
-	vk.GetPhysicalDeviceSurfacePresentModesKHR(state.physical_device, state.surface, &count, nil)
-	if count == 0 {
-		panic("found no physical device surface present modes")
-	}
-	supported_surface_present_modes := make([]vk.PresentModeKHR, count)
-	if res := vk.GetPhysicalDeviceSurfacePresentModesKHR(
-		state.physical_device,
-		state.surface,
-		&count,
-		raw_data(supported_surface_present_modes),
-	); res != vk.Result.SUCCESS {
-		panic("get physical device surface present modes failed")
-	}
+  supported_surface_present_modes := get_physical_device_surface_present_modes(state.physical_device, state.surface)
 	mode_selected := false
 	for available_mode in supported_surface_present_modes {
 		// select preferred present mode if it's supported, else just take FIFO because it's guaranteed to be supported
@@ -687,87 +646,7 @@ main :: proc() {
 	vk.DeviceWaitIdle(state.device)
 }
 
-REQUIRED_LAYER_NAMES := []cstring{"VK_LAYER_KHRONOS_validation"}
-REQUIRED_EXTENSION_NAMES := []cstring{vk.KHR_SWAPCHAIN_EXTENSION_NAME}
-WINDOW_WIDTH :: 800
-WINDOW_HEIGHT :: 600
-
-State :: struct {
-	command_buffer:                  vk.CommandBuffer,
-	command_pool:                    vk.CommandPool,
-	device:                          vk.Device,
-	graphics_pipeline:               vk.Pipeline,
-	graphics_queue:                  vk.Queue,
-	graphics_queue_family_index:     u32,
-	instance:                        vk.Instance,
-	physical_device:                 vk.PhysicalDevice,
-	pipeline_layout:                 vk.PipelineLayout,
-	present_mode:                    vk.PresentModeKHR,
-	present_queue:                   vk.Queue,
-	present_queue_family_index:      u32,
-	render_pass:                     vk.RenderPass,
-	shader_module_fragment:          vk.ShaderModule,
-	shader_module_vertex:            vk.ShaderModule,
-	surface:                         vk.SurfaceKHR,
-	surface_capabilities:            vk.SurfaceCapabilitiesKHR,
-	swapchain:                       vk.SwapchainKHR,
-	swapchain_extent:                vk.Extent2D,
-	swapchain_format:                vk.SurfaceFormatKHR,
-	swapchain_framebuffers:          []vk.Framebuffer,
-	swapchain_image_count:           u32,
-	swapchain_image_index:           u32,
-	swapchain_image_views:           []vk.ImageView,
-	swapchain_images:                []vk.Image,
-	sync_fence_in_flight:            vk.Fence,
-	sync_semaphore_image_available:  vk.Semaphore,
-	sync_semaphore_render_finished:  vk.Semaphore,
-	window:                          glfw.WindowHandle,
-}
-
-check_validation_layer_support :: proc() -> bool {
-	count: u32
-	vk.EnumerateInstanceLayerProperties(&count, nil)
-	available_layers := make([]vk.LayerProperties, count)
-	defer delete(available_layers)
-	if vk.EnumerateInstanceLayerProperties(&count, raw_data(available_layers)) !=
-	   vk.Result.SUCCESS {
-		panic("enumerate instance layer properties failed")
-	}
-	for required_layer_name in REQUIRED_LAYER_NAMES {
-		found := false
-		for &available_layer in available_layers {
-			available_layer_name := cast(cstring)&available_layer.layerName[0]
-			if required_layer_name == available_layer_name {
-				found = true
-			}
-		}
-		if !found {return false}
-	}
-	return true
-}
-
-check_extension_support :: proc(device: vk.PhysicalDevice) -> bool {
-	count: u32
-	vk.EnumerateDeviceExtensionProperties(device, nil, &count, nil)
-	extension_properties := make([]vk.ExtensionProperties, count)
-	defer delete(extension_properties)
-	vk.EnumerateDeviceExtensionProperties(device, nil, &count, raw_data(extension_properties))
-	for required_extension_name in REQUIRED_EXTENSION_NAMES {
-		found := false
-		for available_extension_properties in extension_properties {
-			available_extension_name := available_extension_properties.extensionName
-			if cast(cstring)&available_extension_name[0] == required_extension_name {
-				found = true
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
-}
-
-record_command_buffer :: proc(using state: ^State) {
+record_command_buffer :: proc(using state: ^RendererState) {
 	command_buffer_begin_info := vk.CommandBufferBeginInfo {
 		sType = .COMMAND_BUFFER_BEGIN_INFO,
 	}
