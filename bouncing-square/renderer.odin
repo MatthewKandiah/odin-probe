@@ -40,58 +40,58 @@ RendererState :: struct {
 	window:                          glfw.WindowHandle,
 }
 
-draw_frame :: proc(state: ^RendererState) {
+draw_frame :: proc(using state: ^RendererState) {
 	vk.WaitForFences(
-		state.device,
+		device,
 		1,
-		&state.sync_fences_in_flight[state.frame_index],
+		&sync_fences_in_flight[frame_index],
 		true,
 		max(u64),
 	)
-	vk.ResetFences(state.device, 1, &state.sync_fences_in_flight[state.frame_index])
+	vk.ResetFences(device, 1, &sync_fences_in_flight[frame_index])
 	vk.AcquireNextImageKHR(
-		state.device,
-		state.swapchain,
+		device,
+		swapchain,
 		max(u64),
-		state.sync_semaphores_image_available[state.frame_index],
+		sync_semaphores_image_available[frame_index],
 		0,
-		&state.swapchain_image_index,
+		&swapchain_image_index,
 	)
-	vk.ResetCommandBuffer(state.command_buffers[state.frame_index], {})
+	vk.ResetCommandBuffer(command_buffers[frame_index], {})
 	record_command_buffer(state)
 	wait_stages := []vk.PipelineStageFlags{{.COLOR_ATTACHMENT_OUTPUT}}
 	submit_info := vk.SubmitInfo {
 		sType                = .SUBMIT_INFO,
 		waitSemaphoreCount   = 1,
-		pWaitSemaphores      = &state.sync_semaphores_image_available[state.frame_index],
+		pWaitSemaphores      = &sync_semaphores_image_available[frame_index],
 		pWaitDstStageMask    = raw_data(wait_stages),
 		commandBufferCount   = 1,
-		pCommandBuffers      = &state.command_buffers[state.frame_index],
+		pCommandBuffers      = &command_buffers[frame_index],
 		signalSemaphoreCount = 1,
-		pSignalSemaphores    = &state.sync_semaphores_render_finished[state.frame_index],
+		pSignalSemaphores    = &sync_semaphores_render_finished[frame_index],
 	}
 	if res := vk.QueueSubmit(
-		state.graphics_queue,
+		graphics_queue,
 		1,
 		&submit_info,
-		state.sync_fences_in_flight[state.frame_index],
+		sync_fences_in_flight[frame_index],
 	); res != .SUCCESS {
 		panic("failed to submit draw command buffer")
 	}
 	present_info := vk.PresentInfoKHR {
 		sType              = .PRESENT_INFO_KHR,
 		waitSemaphoreCount = 1,
-		pWaitSemaphores    = &state.sync_semaphores_render_finished[state.frame_index],
+		pWaitSemaphores    = &sync_semaphores_render_finished[frame_index],
 		swapchainCount     = 1,
-		pSwapchains        = &state.swapchain,
-		pImageIndices      = &state.swapchain_image_index,
+		pSwapchains        = &swapchain,
+		pImageIndices      = &swapchain_image_index,
 	}
-	if res := vk.QueuePresentKHR(state.present_queue, &present_info); res != .SUCCESS {
+	if res := vk.QueuePresentKHR(present_queue, &present_info); res != .SUCCESS {
 		panic("failed to present swapchain image")
 	}
 
-  state.frame_index += 1
-  state.frame_index %= MAX_FRAMES_IN_FLIGHT
+  frame_index += 1
+  frame_index %= MAX_FRAMES_IN_FLIGHT
 }
 
 record_command_buffer :: proc(using state: ^RendererState) {
