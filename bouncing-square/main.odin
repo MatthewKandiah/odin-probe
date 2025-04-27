@@ -12,8 +12,6 @@ import "core:os"
 import "vendor:glfw"
 import vk "vendor:vulkan"
 
-REQUIRED_LAYER_NAMES := []cstring{"VK_LAYER_KHRONOS_validation"}
-REQUIRED_EXTENSION_NAMES := []cstring{vk.KHR_SWAPCHAIN_EXTENSION_NAME}
 WINDOW_WIDTH :: 800
 WINDOW_HEIGHT :: 600
 

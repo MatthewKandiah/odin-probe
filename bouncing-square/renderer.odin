@@ -6,6 +6,8 @@ import "core:os"
 import "vendor:glfw"
 import vk "vendor:vulkan"
 
+REQUIRED_LAYER_NAMES := []cstring{"VK_LAYER_KHRONOS_validation"}
+REQUIRED_EXTENSION_NAMES := []cstring{vk.KHR_SWAPCHAIN_EXTENSION_NAME}
 MAX_FRAMES_IN_FLIGHT :: 2
 
 RendererState :: struct {
