@@ -21,7 +21,11 @@ import vk "vendor:vulkan"
 WINDOW_WIDTH :: 800
 WINDOW_HEIGHT :: 600
 
-vertices :: []Vertex{{{0, -0.5}, {1, 0, 0}}, {{0.5, 0.5}, {0, 1, 0}}, {{-0.5, 0.5}, {0, 0, 1}}}
+vertices :: []Vertex {
+	{{0, -0.5}, {1, 0, 0}}, //
+	{{0.5, 0.5}, {0, 1, 0}}, //
+	{{-0.5, 0.5}, {0, 0, 1}}, //
+}
 
 main :: proc() {
 	state: RendererState
@@ -491,7 +495,11 @@ main :: proc() {
 		{},
 		&vertex_buffer_data,
 	)
-  intrinsics.mem_copy_non_overlapping(vertex_buffer_data, raw_data(vertices), vertex_buffer_create_info.size)
+	intrinsics.mem_copy_non_overlapping(
+		vertex_buffer_data,
+		raw_data(vertices),
+		vertex_buffer_create_info.size,
+	)
 	vk.UnmapMemory(state.device, state.vertex_buffer_memory)
 
 	// create command buffers
