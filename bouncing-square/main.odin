@@ -187,7 +187,10 @@ main :: proc() {
 	delete(supported_surface_formats)
 
 	// get physical device surface present modes
-  supported_surface_present_modes := get_physical_device_surface_present_modes(state.physical_device, state.surface)
+	supported_surface_present_modes := get_physical_device_surface_present_modes(
+		state.physical_device,
+		state.surface,
+	)
 	mode_selected := false
 	for available_mode in supported_surface_present_modes {
 		// select preferred present mode if it's supported, else just take FIFO because it's guaranteed to be supported
@@ -256,14 +259,7 @@ main :: proc() {
 	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
 
 	// get swapchain images
-	vk.GetSwapchainImagesKHR(state.device, state.swapchain, &state.swapchain_image_count, nil)
-	state.swapchain_images = make([]vk.Image, state.swapchain_image_count)
-	vk.GetSwapchainImagesKHR(
-		state.device,
-		state.swapchain,
-		&state.swapchain_image_count,
-		raw_data(state.swapchain_images),
-	)
+	state.swapchain_images = get_swapchain_images(state.device, state.swapchain)
 	defer delete(state.swapchain_images)
 
 	// create swapchain image views
@@ -326,7 +322,6 @@ main :: proc() {
 	); res != vk.Result.SUCCESS {
 		panic("failed to create vertex shader module")
 	}
-
 	if res := vk.CreateShaderModule(
 		state.device,
 		&create_info_fragment,
@@ -510,7 +505,6 @@ main :: proc() {
 			height          = state.swapchain_extent.height,
 			layers          = 1,
 		}
-
 		if res := vk.CreateFramebuffer(
 			state.device,
 			&framebuffer_create_info,
@@ -597,92 +591,7 @@ main :: proc() {
 	// main loop
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
-
-		// draw frame
-		vk.WaitForFences(state.device, 1, &state.sync_fence_in_flight, true, max(u64))
-		vk.ResetFences(state.device, 1, &state.sync_fence_in_flight)
-		vk.AcquireNextImageKHR(
-			state.device,
-			state.swapchain,
-			max(u64),
-			state.sync_semaphore_image_available,
-			0,
-			&state.swapchain_image_index,
-		)
-		vk.ResetCommandBuffer(state.command_buffer, {})
-		record_command_buffer(&state)
-		wait_stages := []vk.PipelineStageFlags{{.COLOR_ATTACHMENT_OUTPUT}}
-		submit_info := vk.SubmitInfo {
-			sType                = .SUBMIT_INFO,
-			waitSemaphoreCount   = 1,
-			pWaitSemaphores      = &state.sync_semaphore_image_available,
-			pWaitDstStageMask    = raw_data(wait_stages),
-			commandBufferCount   = 1,
-			pCommandBuffers      = &state.command_buffer,
-			signalSemaphoreCount = 1,
-			pSignalSemaphores    = &state.sync_semaphore_render_finished,
-		}
-		if res := vk.QueueSubmit(
-			state.graphics_queue,
-			1,
-			&submit_info,
-			state.sync_fence_in_flight,
-		); res != .SUCCESS {
-			panic("failed to submit draw command buffer")
-		}
-		present_info := vk.PresentInfoKHR {
-			sType              = .PRESENT_INFO_KHR,
-			waitSemaphoreCount = 1,
-			pWaitSemaphores    = &state.sync_semaphore_render_finished,
-			swapchainCount     = 1,
-			pSwapchains        = &state.swapchain,
-			pImageIndices      = &state.swapchain_image_index,
-		}
-		if res := vk.QueuePresentKHR(state.present_queue, &present_info); res != .SUCCESS {
-			panic("failed to present swapchain image")
-		}
+		draw_frame(&state)
 	}
-
 	vk.DeviceWaitIdle(state.device)
-}
-
-record_command_buffer :: proc(using state: ^RendererState) {
-	command_buffer_begin_info := vk.CommandBufferBeginInfo {
-		sType = .COMMAND_BUFFER_BEGIN_INFO,
-	}
-	if res := vk.BeginCommandBuffer(command_buffer, &command_buffer_begin_info); res != .SUCCESS {
-		panic("failed to begin recording command buffer")
-	}
-	clear_colour := vk.ClearValue {
-		color = {float32 = {0, 0, 0, 1}},
-	}
-	render_pass_begin_info := vk.RenderPassBeginInfo {
-		sType = .RENDER_PASS_BEGIN_INFO,
-		renderPass = render_pass,
-		framebuffer = swapchain_framebuffers[swapchain_image_index],
-		renderArea = vk.Rect2D{offset = {0, 0}, extent = swapchain_extent},
-		clearValueCount = 1,
-		pClearValues = &clear_colour,
-	}
-	vk.CmdBeginRenderPass(command_buffer, &render_pass_begin_info, .INLINE)
-	vk.CmdBindPipeline(command_buffer, .GRAPHICS, graphics_pipeline)
-	viewport := vk.Viewport {
-		x        = 0,
-		y        = 0,
-		width    = cast(f32)swapchain_extent.width,
-		height   = cast(f32)swapchain_extent.height,
-		minDepth = 0,
-		maxDepth = 1,
-	}
-	vk.CmdSetViewport(command_buffer, 0, 1, &viewport)
-	scissor := vk.Rect2D {
-		offset = {0, 0},
-		extent = swapchain_extent,
-	}
-	vk.CmdSetScissor(command_buffer, 0, 1, &scissor)
-	vk.CmdDraw(command_buffer, 3, 1, 0, 0)
-	vk.CmdEndRenderPass(command_buffer)
-	if res := vk.EndCommandBuffer(command_buffer); res != .SUCCESS {
-		panic("failed to record command buffer")
-	}
 }
