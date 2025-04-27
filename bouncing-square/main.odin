@@ -1,9 +1,13 @@
 /*
   goal - have a cpu-based program updating the position and/or size of a textured quad and draw it using the gpu
 */
-// TODO-Matt: didn't like my error handling, mix of returning bool and panicking
-//            have flattened everything down, now want to simplify State if possible and pull out any repeated behaviour that would be useful for reuse before building further
-//            would be nice to wrap clunky Vulkan API calls that require an enumeration call then a real call in functions that just return the needed value
+/*
+  TODO-Matt
+  - move vertex data from being hardcoded in the shader to this program, and pass it into a gpu vertex buffer
+  - use a staging buffer to move the vertex data into faster gpu memory
+  - use an index buffer to draw a quad using 4 vertices
+  - work out how we want to update the quad's position so we can calculate its position as it bounces around the screen on the cpu, and draw it effiently on the gpu
+*/
 package main
 
 import "base:runtime"
