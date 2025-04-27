@@ -543,12 +543,12 @@ main :: proc() {
 		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
 		commandPool        = state.command_pool,
 		level              = .PRIMARY,
-		commandBufferCount = 1,
+		commandBufferCount = len(state.command_buffers),
 	}
 	if res := vk.AllocateCommandBuffers(
 		state.device,
 		&command_buffer_allocate_info,
-		&state.command_buffer,
+		&state.command_buffers[0],
 	); res != .SUCCESS {
 		panic("allocate command buffers failed")
 	}
@@ -561,30 +561,38 @@ main :: proc() {
 		sType = .FENCE_CREATE_INFO,
 		flags = {.SIGNALED},
 	}
-	if res := vk.CreateSemaphore(
-		state.device,
-		&semaphore_create_info,
-		nil,
-		&state.sync_semaphore_image_available,
-	); res != .SUCCESS {
-		panic("create image available semaphore failed")
-	}
-	if res := vk.CreateSemaphore(
-		state.device,
-		&semaphore_create_info,
-		nil,
-		&state.sync_semaphore_render_finished,
-	); res != .SUCCESS {
-		panic("create render finished semaphore failed")
-	}
-	if res := vk.CreateFence(state.device, &fence_create_info, nil, &state.sync_fence_in_flight);
-	   res != .SUCCESS {
-		panic("create in-flight fence failed")
+	for i in 0 ..< MAX_FRAMES_IN_FLIGHT {
+		if res := vk.CreateSemaphore(
+			state.device,
+			&semaphore_create_info,
+			nil,
+			&state.sync_semaphores_image_available[i],
+		); res != .SUCCESS {
+			panic("create image available semaphore failed")
+		}
+		if res := vk.CreateSemaphore(
+			state.device,
+			&semaphore_create_info,
+			nil,
+			&state.sync_semaphores_render_finished[i],
+		); res != .SUCCESS {
+			panic("create render finished semaphore failed")
+		}
+		if res := vk.CreateFence(
+			state.device,
+			&fence_create_info,
+			nil,
+			&state.sync_fences_in_flight[i],
+		); res != .SUCCESS {
+			panic("create in-flight fence failed")
+		}
 	}
 	defer {
-		vk.DestroySemaphore(state.device, state.sync_semaphore_image_available, nil)
-		vk.DestroySemaphore(state.device, state.sync_semaphore_render_finished, nil)
-		vk.DestroyFence(state.device, state.sync_fence_in_flight, nil)
+		for i in 0 ..< MAX_FRAMES_IN_FLIGHT {
+			vk.DestroySemaphore(state.device, state.sync_semaphores_image_available[i], nil)
+			vk.DestroySemaphore(state.device, state.sync_semaphores_render_finished[i], nil)
+			vk.DestroyFence(state.device, state.sync_fences_in_flight[i], nil)
+		}
 	}
 
 	// main loop
