@@ -234,65 +234,7 @@ main :: proc() {
 		state.swapchain_extent = state.surface_capabilities.currentExtent
 	}
 
-	// create swapchain
-	swapchain_create_info := vk.SwapchainCreateInfoKHR {
-		sType            = .SWAPCHAIN_CREATE_INFO_KHR,
-		surface          = state.surface,
-		oldSwapchain     = 0, // VK_NULL_HANDLE
-		imageFormat      = state.swapchain_format.format,
-		imageColorSpace  = state.swapchain_format.colorSpace,
-		presentMode      = state.present_mode,
-		imageExtent      = state.swapchain_extent,
-		minImageCount    = state.surface_capabilities.minImageCount + 1,
-		imageUsage       = {.COLOR_ATTACHMENT},
-		imageArrayLayers = 1,
-		imageSharingMode = .EXCLUSIVE,
-		compositeAlpha   = {.OPAQUE},
-		clipped          = true,
-		preTransform     = state.surface_capabilities.currentTransform,
-	}
-	if res := vk.CreateSwapchainKHR(state.device, &swapchain_create_info, nil, &state.swapchain);
-	   res != vk.Result.SUCCESS {
-		panic("create swapchain failed")
-	}
-	defer vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
-
-	// get swapchain images
-	state.swapchain_images = get_swapchain_images(state.device, state.swapchain)
-	defer delete(state.swapchain_images)
-
-	// create swapchain image views
-	state.swapchain_image_views = make([]vk.ImageView, len(state.swapchain_images))
-	for i in 0 ..< len(state.swapchain_images) {
-		image_view_create_info := vk.ImageViewCreateInfo {
-			sType = .IMAGE_VIEW_CREATE_INFO,
-			image = state.swapchain_images[i],
-			viewType = vk.ImageViewType.D2,
-			format = state.swapchain_format.format,
-			components = {r = .IDENTITY, g = .IDENTITY, b = .IDENTITY, a = .IDENTITY},
-			subresourceRange = {
-				aspectMask = {.COLOR},
-				baseMipLevel = 0,
-				levelCount = 1,
-				baseArrayLayer = 0,
-				layerCount = 1,
-			},
-		}
-		if res := vk.CreateImageView(
-			state.device,
-			&image_view_create_info,
-			nil,
-			&state.swapchain_image_views[i],
-		); res != vk.Result.SUCCESS {
-			panic("create image view failed")
-		}
-	}
-	defer {
-		for image_view in state.swapchain_image_views {
-			vk.DestroyImageView(state.device, image_view, nil)
-		}
-		delete(state.swapchain_image_views)
-	}
+  setup_new_swapchain(&state)
 
 	// create shader modules
 	shader_code_vertex, vert_shader_read_ok := os.read_entire_file("vert.spv")
@@ -492,33 +434,8 @@ main :: proc() {
 		vk.DestroyRenderPass(state.device, state.render_pass, nil)
 	}
 
-	// create framebuffers
-	state.swapchain_framebuffers = make([]vk.Framebuffer, len(state.swapchain_image_views))
-	for i in 0 ..< len(state.swapchain_image_views) {
-		framebuffer_create_info := vk.FramebufferCreateInfo {
-			sType           = .FRAMEBUFFER_CREATE_INFO,
-			renderPass      = state.render_pass,
-			attachmentCount = 1,
-			pAttachments    = &state.swapchain_image_views[i],
-			width           = state.swapchain_extent.width,
-			height          = state.swapchain_extent.height,
-			layers          = 1,
-		}
-		if res := vk.CreateFramebuffer(
-			state.device,
-			&framebuffer_create_info,
-			nil,
-			&state.swapchain_framebuffers[i],
-		); res != .SUCCESS {
-			panic("create framebuffer failed")
-		}
-	}
-	defer {
-		for framebuffer in state.swapchain_framebuffers {
-			vk.DestroyFramebuffer(state.device, framebuffer, nil)
-		}
-		delete(state.swapchain_framebuffers)
-	}
+  setup_new_framebuffers(&state)
+  defer clean_up_swapchain(&state)
 
 	// create command pool
 	command_pool_create_info := vk.CommandPoolCreateInfo {

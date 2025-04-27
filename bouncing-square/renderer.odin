@@ -40,16 +40,106 @@ RendererState :: struct {
 	window:                          glfw.WindowHandle,
 }
 
+setup_new_swapchain :: proc(state: ^RendererState) {
+	// create swapchain
+	swapchain_create_info := vk.SwapchainCreateInfoKHR {
+		sType            = .SWAPCHAIN_CREATE_INFO_KHR,
+		surface          = state.surface,
+		oldSwapchain     = 0, // VK_NULL_HANDLE
+		imageFormat      = state.swapchain_format.format,
+		imageColorSpace  = state.swapchain_format.colorSpace,
+		presentMode      = state.present_mode,
+		imageExtent      = state.swapchain_extent,
+		minImageCount    = state.surface_capabilities.minImageCount + 1,
+		imageUsage       = {.COLOR_ATTACHMENT},
+		imageArrayLayers = 1,
+		imageSharingMode = .EXCLUSIVE,
+		compositeAlpha   = {.OPAQUE},
+		clipped          = true,
+		preTransform     = state.surface_capabilities.currentTransform,
+	}
+	if res := vk.CreateSwapchainKHR(state.device, &swapchain_create_info, nil, &state.swapchain);
+	   res != vk.Result.SUCCESS {
+		panic("create swapchain failed")
+	}
+
+	// get swapchain images
+	state.swapchain_images = get_swapchain_images(state.device, state.swapchain)
+
+	// create swapchain image views
+	state.swapchain_image_views = make([]vk.ImageView, len(state.swapchain_images))
+	for i in 0 ..< len(state.swapchain_images) {
+		image_view_create_info := vk.ImageViewCreateInfo {
+			sType = .IMAGE_VIEW_CREATE_INFO,
+			image = state.swapchain_images[i],
+			viewType = vk.ImageViewType.D2,
+			format = state.swapchain_format.format,
+			components = {r = .IDENTITY, g = .IDENTITY, b = .IDENTITY, a = .IDENTITY},
+			subresourceRange = {
+				aspectMask = {.COLOR},
+				baseMipLevel = 0,
+				levelCount = 1,
+				baseArrayLayer = 0,
+				layerCount = 1,
+			},
+		}
+		if res := vk.CreateImageView(
+			state.device,
+			&image_view_create_info,
+			nil,
+			&state.swapchain_image_views[i],
+		); res != vk.Result.SUCCESS {
+			panic("create image view failed")
+		}
+	}
+}
+
+setup_new_framebuffers :: proc(state: ^RendererState) {
+	state.swapchain_framebuffers = make([]vk.Framebuffer, len(state.swapchain_image_views))
+	for i in 0 ..< len(state.swapchain_image_views) {
+		framebuffer_create_info := vk.FramebufferCreateInfo {
+			sType           = .FRAMEBUFFER_CREATE_INFO,
+			renderPass      = state.render_pass,
+			attachmentCount = 1,
+			pAttachments    = &state.swapchain_image_views[i],
+			width           = state.swapchain_extent.width,
+			height          = state.swapchain_extent.height,
+			layers          = 1,
+		}
+		if res := vk.CreateFramebuffer(
+			state.device,
+			&framebuffer_create_info,
+			nil,
+			&state.swapchain_framebuffers[i],
+		); res != .SUCCESS {
+			panic("create framebuffer failed")
+		}
+	}
+}
+
+clean_up_swapchain :: proc(state: ^RendererState) {
+	for framebuffer in state.swapchain_framebuffers {
+		vk.DestroyFramebuffer(state.device, framebuffer, nil)
+	}
+	delete(state.swapchain_framebuffers)
+	for image_view in state.swapchain_image_views {
+		vk.DestroyImageView(state.device, image_view, nil)
+	}
+	delete(state.swapchain_image_views)
+	delete(state.swapchain_images)
+	vk.DestroySwapchainKHR(state.device, state.swapchain, nil)
+}
+
+recreate_swapchain :: proc(state: ^RendererState) {
+	vk.DeviceWaitIdle(state.device)
+	clean_up_swapchain(state)
+	setup_new_swapchain(state)
+	setup_new_framebuffers(state)
+}
+
 draw_frame :: proc(using state: ^RendererState) {
-	vk.WaitForFences(
-		device,
-		1,
-		&sync_fences_in_flight[frame_index],
-		true,
-		max(u64),
-	)
-	vk.ResetFences(device, 1, &sync_fences_in_flight[frame_index])
-	vk.AcquireNextImageKHR(
+	vk.WaitForFences(device, 1, &sync_fences_in_flight[frame_index], true, max(u64))
+	acquire_next_image_res := vk.AcquireNextImageKHR(
 		device,
 		swapchain,
 		max(u64),
@@ -57,6 +147,11 @@ draw_frame :: proc(using state: ^RendererState) {
 		0,
 		&swapchain_image_index,
 	)
+	if acquire_next_image_res == .ERROR_OUT_OF_DATE_KHR {
+		recreate_swapchain(state)
+		return
+	}
+	vk.ResetFences(device, 1, &sync_fences_in_flight[frame_index])
 	vk.ResetCommandBuffer(command_buffers[frame_index], {})
 	record_command_buffer(state)
 	wait_stages := []vk.PipelineStageFlags{{.COLOR_ATTACHMENT_OUTPUT}}
@@ -70,12 +165,15 @@ draw_frame :: proc(using state: ^RendererState) {
 		signalSemaphoreCount = 1,
 		pSignalSemaphores    = &sync_semaphores_render_finished[frame_index],
 	}
-	if res := vk.QueueSubmit(
+	queue_submit_res := vk.QueueSubmit(
 		graphics_queue,
 		1,
 		&submit_info,
 		sync_fences_in_flight[frame_index],
-	); res != .SUCCESS {
+	)
+	if queue_submit_res == .ERROR_OUT_OF_DATE_KHR || queue_submit_res == .SUBOPTIMAL_KHR {
+		recreate_swapchain(state)
+	} else if queue_submit_res != .SUCCESS {
 		panic("failed to submit draw command buffer")
 	}
 	present_info := vk.PresentInfoKHR {
@@ -90,8 +188,8 @@ draw_frame :: proc(using state: ^RendererState) {
 		panic("failed to present swapchain image")
 	}
 
-  frame_index += 1
-  frame_index %= MAX_FRAMES_IN_FLIGHT
+	frame_index += 1
+	frame_index %= MAX_FRAMES_IN_FLIGHT
 }
 
 record_command_buffer :: proc(using state: ^RendererState) {
