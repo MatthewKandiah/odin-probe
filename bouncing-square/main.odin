@@ -446,44 +446,17 @@ main :: proc() {
 	}
 
 	// create vertex buffer, allocate memory for it, and bind buffer to memory
-	vertex_buffer_create_info := vk.BufferCreateInfo {
-		sType       = .BUFFER_CREATE_INFO,
-		size        = cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices)),
-		usage       = {.VERTEX_BUFFER},
-		sharingMode = .EXCLUSIVE,
-	}
-	if res := vk.CreateBuffer(state.device, &vertex_buffer_create_info, nil, &state.vertex_buffer);
-	   res != .SUCCESS {
-		panic("create vertex buffer failed")
-	}
+  vertex_buffer_size := cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices))
+	state.vertex_buffer, state.vertex_buffer_memory = create_buffer(
+		&state,
+    vertex_buffer_size,
+		{.VERTEX_BUFFER},
+		{.HOST_VISIBLE, .HOST_COHERENT},
+	)
 	defer {
 		vk.DestroyBuffer(state.device, state.vertex_buffer, nil)
 		vk.FreeMemory(state.device, state.vertex_buffer_memory, nil)
 	}
-	vertex_buffer_memory_requirements: vk.MemoryRequirements
-	vk.GetBufferMemoryRequirements(
-		state.device,
-		state.vertex_buffer,
-		&vertex_buffer_memory_requirements,
-	)
-	vertex_buffer_allocate_info := vk.MemoryAllocateInfo {
-		sType           = .MEMORY_ALLOCATE_INFO,
-		allocationSize  = vertex_buffer_memory_requirements.size,
-		memoryTypeIndex = find_memory_type(
-			&state,
-			vertex_buffer_memory_requirements.memoryTypeBits,
-			{.HOST_VISIBLE, .HOST_COHERENT},
-		),
-	}
-	if res := vk.AllocateMemory(
-		state.device,
-		&vertex_buffer_allocate_info,
-		nil,
-		&state.vertex_buffer_memory,
-	); res != .SUCCESS {
-		panic("failed to allocate vertex buffer memory")
-	}
-	vk.BindBufferMemory(state.device, state.vertex_buffer, state.vertex_buffer_memory, 0)
 
 	// fill the gpu vertex buffer with our vertex data
 	vertex_buffer_data: rawptr
@@ -491,14 +464,14 @@ main :: proc() {
 		state.device,
 		state.vertex_buffer_memory,
 		0,
-		vertex_buffer_create_info.size,
+		vertex_buffer_size,
 		{},
 		&vertex_buffer_data,
 	)
 	intrinsics.mem_copy_non_overlapping(
 		vertex_buffer_data,
 		raw_data(vertices),
-		vertex_buffer_create_info.size,
+		vertex_buffer_size,
 	)
 	vk.UnmapMemory(state.device, state.vertex_buffer_memory)
 

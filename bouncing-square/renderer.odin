@@ -454,3 +454,43 @@ find_memory_type :: proc(
 	}
 	panic("failed to find suitable memory type")
 }
+
+create_buffer :: proc(
+	state: ^RendererState,
+	size: vk.DeviceSize,
+	usage: vk.BufferUsageFlags,
+	memory_properties: vk.MemoryPropertyFlags,
+) -> (
+	buffer: vk.Buffer,
+	buffer_memory: vk.DeviceMemory,
+) {
+	// create buffer
+	buffer_create_info := vk.BufferCreateInfo {
+		sType       = .BUFFER_CREATE_INFO,
+		size        = size,
+		usage       = usage,
+		sharingMode = .EXCLUSIVE,
+	}
+	if res := vk.CreateBuffer(state.device, &buffer_create_info, nil, &buffer); res != .SUCCESS {
+		panic("create vertex buffer failed")
+	}
+	// allocate and bind memory
+	buffer_memory_requirements: vk.MemoryRequirements
+	vk.GetBufferMemoryRequirements(state.device, buffer, &buffer_memory_requirements)
+	buffer_allocate_info := vk.MemoryAllocateInfo {
+		sType           = .MEMORY_ALLOCATE_INFO,
+		allocationSize  = buffer_memory_requirements.size,
+		memoryTypeIndex = find_memory_type(
+			state,
+			buffer_memory_requirements.memoryTypeBits,
+			memory_properties,
+		),
+	}
+	if res := vk.AllocateMemory(state.device, &buffer_allocate_info, nil, &buffer_memory);
+	   res != .SUCCESS {
+		panic("failed to allocate vertex buffer memory")
+	}
+	vk.BindBufferMemory(state.device, buffer, buffer_memory, 0)
+
+  return buffer, buffer_memory
+}
