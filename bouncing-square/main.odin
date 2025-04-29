@@ -445,35 +445,38 @@ main :: proc() {
 		vk.DestroyCommandPool(state.device, state.command_pool, nil)
 	}
 
-	// create vertex buffer, allocate memory for it, and bind buffer to memory
-  vertex_buffer_size := cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices))
-	state.vertex_buffer, state.vertex_buffer_memory = create_buffer(
-		&state,
-    vertex_buffer_size,
-		{.VERTEX_BUFFER},
-		{.HOST_VISIBLE, .HOST_COHERENT},
-	)
+	{ 	// create vertex buffer, allocate memory for it, and bind buffer to memory
+		buffer_size := cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices))
+
+		staging_buffer, staging_buffer_memory := create_buffer(
+			&state,
+			buffer_size,
+			{.TRANSFER_SRC},
+			{.HOST_VISIBLE, .HOST_COHERENT},
+		)
+		defer {
+			vk.DestroyBuffer(state.device, staging_buffer, nil)
+			vk.FreeMemory(state.device, staging_buffer_memory, nil)
+		}
+
+		state.vertex_buffer, state.vertex_buffer_memory = create_buffer(
+			&state,
+			buffer_size,
+			{.VERTEX_BUFFER, .TRANSFER_DST},
+			{.DEVICE_LOCAL},
+		)
+
+		// fill the gpu staging buffer with our vertex data and copy it to the command buffer
+		staging_buffer_data: rawptr
+		vk.MapMemory(state.device, staging_buffer_memory, 0, buffer_size, {}, &staging_buffer_data)
+		intrinsics.mem_copy_non_overlapping(staging_buffer_data, raw_data(vertices), buffer_size)
+		vk.UnmapMemory(state.device, staging_buffer_memory)
+		copy_buffer(&state, staging_buffer, state.vertex_buffer, buffer_size)
+	}
 	defer {
 		vk.DestroyBuffer(state.device, state.vertex_buffer, nil)
 		vk.FreeMemory(state.device, state.vertex_buffer_memory, nil)
 	}
-
-	// fill the gpu vertex buffer with our vertex data
-	vertex_buffer_data: rawptr
-	vk.MapMemory(
-		state.device,
-		state.vertex_buffer_memory,
-		0,
-		vertex_buffer_size,
-		{},
-		&vertex_buffer_data,
-	)
-	intrinsics.mem_copy_non_overlapping(
-		vertex_buffer_data,
-		raw_data(vertices),
-		vertex_buffer_size,
-	)
-	vk.UnmapMemory(state.device, state.vertex_buffer_memory)
 
 	// create command buffers
 	command_buffer_allocate_info := vk.CommandBufferAllocateInfo {

@@ -492,5 +492,43 @@ create_buffer :: proc(
 	}
 	vk.BindBufferMemory(state.device, buffer, buffer_memory, 0)
 
-  return buffer, buffer_memory
+	return buffer, buffer_memory
+}
+
+copy_buffer :: proc(state: ^RendererState, src: vk.Buffer, dst: vk.Buffer, size: vk.DeviceSize) {
+	command_buffer_allocate_info := vk.CommandBufferAllocateInfo {
+		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
+		level              = .PRIMARY,
+		commandPool        = state.command_pool,
+		commandBufferCount = 1,
+	}
+	temp_command_buffer: vk.CommandBuffer
+	if res := vk.AllocateCommandBuffers(
+		state.device,
+		&command_buffer_allocate_info,
+		&temp_command_buffer,
+	); res != .SUCCESS {
+		panic("failed to allocate temporary command buffer for copy")
+	}
+	command_buffer_begin_info := vk.CommandBufferBeginInfo {
+		sType = .COMMAND_BUFFER_BEGIN_INFO,
+		flags = {.ONE_TIME_SUBMIT},
+	}
+	if res := vk.BeginCommandBuffer(temp_command_buffer, &command_buffer_begin_info);
+	   res != .SUCCESS {
+		panic("failed to begin temporary command buffer for copy")
+	}
+	buffer_copy_info := vk.BufferCopy {
+		size = size,
+	}
+	vk.CmdCopyBuffer(temp_command_buffer, src, dst, 1, &buffer_copy_info)
+	vk.EndCommandBuffer(temp_command_buffer)
+	submit_info := vk.SubmitInfo {
+		sType              = .SUBMIT_INFO,
+		commandBufferCount = 1,
+		pCommandBuffers    = &temp_command_buffer,
+	}
+	vk.QueueSubmit(state.graphics_queue, 1, &submit_info, 0)
+	vk.QueueWaitIdle(state.graphics_queue)
+	vk.FreeCommandBuffers(state.device, state.command_pool, 1, &temp_command_buffer)
 }
