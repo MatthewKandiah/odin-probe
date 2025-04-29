@@ -3,10 +3,7 @@
 */
 /*
   TODO-Matt
-  - move vertex data from being hardcoded in the shader to this program, and pass it into a gpu vertex buffer
-  - use a staging buffer to move the vertex data into faster gpu memory
-  - use an index buffer to draw a quad using 4 vertices
-  - work out how we want to update the quad's position so we can calculate its position as it bounces around the screen on the cpu, and draw it effiently on the gpu
+  - use uniform to update the drawn image each frame (colour / position)
 */
 package main
 
