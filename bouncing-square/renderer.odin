@@ -41,6 +41,8 @@ RendererState :: struct {
 	graphics_pipeline:               vk.Pipeline,
 	graphics_queue:                  vk.Queue,
 	graphics_queue_family_index:     u32,
+	index_buffer:                    vk.Buffer,
+	index_buffer_memory:             vk.DeviceMemory,
 	instance:                        vk.Instance,
 	physical_device:                 vk.PhysicalDevice,
 	pipeline_layout:                 vk.PipelineLayout,
@@ -291,6 +293,7 @@ record_command_buffer :: proc(using state: ^RendererState) {
 		raw_data(vertex_buffers),
 		raw_data(offsets),
 	)
+  vk.CmdBindIndexBuffer(command_buffers[frame_index], state.index_buffer, 0, .UINT32)
 	viewport := vk.Viewport {
 		x        = 0,
 		y        = 0,
@@ -305,12 +308,13 @@ record_command_buffer :: proc(using state: ^RendererState) {
 		extent = swapchain_extent,
 	}
 	vk.CmdSetScissor(command_buffers[frame_index], 0, 1, &scissor)
-	vk.CmdDraw(
+	vk.CmdDrawIndexed(
 		command_buffers[frame_index],
-		cast(u32)(size_of(vertices[0]) * len(vertices)),
+    cast(u32)len(indices),
 		1,
 		0,
 		0,
+    0,
 	)
 	vk.CmdEndRenderPass(command_buffers[frame_index])
 	if res := vk.EndCommandBuffer(command_buffers[frame_index]); res != .SUCCESS {
@@ -472,7 +476,7 @@ create_buffer :: proc(
 		sharingMode = .EXCLUSIVE,
 	}
 	if res := vk.CreateBuffer(state.device, &buffer_create_info, nil, &buffer); res != .SUCCESS {
-		panic("create vertex buffer failed")
+		panic("create buffer failed")
 	}
 	// allocate and bind memory
 	buffer_memory_requirements: vk.MemoryRequirements
@@ -488,7 +492,7 @@ create_buffer :: proc(
 	}
 	if res := vk.AllocateMemory(state.device, &buffer_allocate_info, nil, &buffer_memory);
 	   res != .SUCCESS {
-		panic("failed to allocate vertex buffer memory")
+		panic("failed to allocate buffer memory")
 	}
 	vk.BindBufferMemory(state.device, buffer, buffer_memory, 0)
 

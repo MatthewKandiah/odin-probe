@@ -22,10 +22,13 @@ WINDOW_WIDTH :: 800
 WINDOW_HEIGHT :: 600
 
 vertices :: []Vertex {
-	{{0, -0.5}, {1, 0, 0}}, //
-	{{0.5, 0.5}, {0, 1, 0}}, //
-	{{-0.5, 0.5}, {0, 0, 1}}, //
+	{{-0.5, -0.5}, {1, 0, 0}}, // top left
+	{{0.5, -0.5}, {0, 1, 0}}, // top right
+	{{0.5, 0.5}, {0, 0, 1}}, // bottom right
+	{{-0.5, 0.5}, {1, 1, 1}}, // bottom left
 }
+
+indices :: []u32{0, 1, 2, 2, 3, 0}
 
 main :: proc() {
 	state: RendererState
@@ -466,7 +469,6 @@ main :: proc() {
 			{.DEVICE_LOCAL},
 		)
 
-		// fill the gpu staging buffer with our vertex data and copy it to the command buffer
 		staging_buffer_data: rawptr
 		vk.MapMemory(state.device, staging_buffer_memory, 0, buffer_size, {}, &staging_buffer_data)
 		intrinsics.mem_copy_non_overlapping(staging_buffer_data, raw_data(vertices), buffer_size)
@@ -476,6 +478,38 @@ main :: proc() {
 	defer {
 		vk.DestroyBuffer(state.device, state.vertex_buffer, nil)
 		vk.FreeMemory(state.device, state.vertex_buffer_memory, nil)
+	}
+
+	{ 	// create index buffer, allocate memory for it, and bind buffer to memory
+		buffer_size := cast(vk.DeviceSize)(size_of(indices[0]) * len(indices))
+
+		staging_buffer, staging_buffer_memory := create_buffer(
+			&state,
+			buffer_size,
+			{.TRANSFER_SRC},
+			{.HOST_VISIBLE, .HOST_COHERENT},
+		)
+		defer {
+			vk.DestroyBuffer(state.device, staging_buffer, nil)
+			vk.FreeMemory(state.device, staging_buffer_memory, nil)
+		}
+
+		state.index_buffer, state.index_buffer_memory = create_buffer(
+			&state,
+			buffer_size,
+			{.INDEX_BUFFER, .TRANSFER_DST},
+			{.DEVICE_LOCAL},
+		)
+
+		staging_buffer_data: rawptr
+		vk.MapMemory(state.device, staging_buffer_memory, 0, buffer_size, {}, &staging_buffer_data)
+		intrinsics.mem_copy_non_overlapping(staging_buffer_data, raw_data(indices), buffer_size)
+		vk.UnmapMemory(state.device, staging_buffer_memory)
+		copy_buffer(&state, staging_buffer, state.index_buffer, buffer_size)
+	}
+	defer {
+		vk.DestroyBuffer(state.device, state.index_buffer, nil)
+		vk.FreeMemory(state.device, state.index_buffer_memory, nil)
 	}
 
 	// create command buffers
