@@ -1,9 +1,12 @@
 package main
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
+import "core:math"
 import "core:math/linalg/glsl"
 import "core:os"
+import "core:time"
 import "vendor:glfw"
 import vk "vendor:vulkan"
 
@@ -14,6 +17,11 @@ MAX_FRAMES_IN_FLIGHT :: 2
 Vertex :: struct {
 	pos:   glsl.vec2,
 	color: glsl.vec3,
+}
+
+// TODO-Matt: assumed that the memory layout matches what the glsl shader expects, not checked this
+UniformBufferObject :: struct {
+	translation: glsl.vec2,
 }
 
 vertex_input_binding_description := vk.VertexInputBindingDescription {
@@ -35,6 +43,9 @@ vertex_input_attribute_descriptions := [2]vk.VertexInputAttributeDescription {
 RendererState :: struct {
 	command_buffers:                 [MAX_FRAMES_IN_FLIGHT]vk.CommandBuffer,
 	command_pool:                    vk.CommandPool,
+	descriptor_pool:                 vk.DescriptorPool,
+	descriptor_sets:                 [MAX_FRAMES_IN_FLIGHT]vk.DescriptorSet,
+	descriptor_set_layout:           vk.DescriptorSetLayout,
 	device:                          vk.Device,
 	frame_buffer_resized:            bool,
 	frame_index:                     u32,
@@ -64,6 +75,9 @@ RendererState :: struct {
 	sync_fences_in_flight:           [MAX_FRAMES_IN_FLIGHT]vk.Fence,
 	sync_semaphores_image_available: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
 	sync_semaphores_render_finished: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
+	uniform_buffers:                 [MAX_FRAMES_IN_FLIGHT]vk.Buffer,
+	uniform_buffers_memory:          [MAX_FRAMES_IN_FLIGHT]vk.DeviceMemory,
+	uniform_buffers_mapped:          [MAX_FRAMES_IN_FLIGHT]rawptr,
 	window:                          glfw.WindowHandle,
 	vertex_buffer:                   vk.Buffer,
 	vertex_buffer_memory:            vk.DeviceMemory,
@@ -204,6 +218,8 @@ recreate_swapchain :: proc(state: ^RendererState) {
 	setup_new_framebuffers(state)
 }
 
+start_time := time.now()._nsec
+
 draw_frame :: proc(using state: ^RendererState) {
 	vk.WaitForFences(device, 1, &sync_fences_in_flight[frame_index], true, max(u64))
 	acquire_next_image_res := vk.AcquireNextImageKHR(
@@ -221,6 +237,13 @@ draw_frame :: proc(using state: ^RendererState) {
 	vk.ResetFences(device, 1, &sync_fences_in_flight[frame_index])
 	vk.ResetCommandBuffer(command_buffers[frame_index], {})
 	record_command_buffer(state)
+	current_time := time.now()._nsec
+	time: f32 = cast(f32)((current_time - start_time) * 15 / 1_000_000_000)
+	ubo := UniformBufferObject {
+		translation = {math.sin(time) / 5, 0},
+	}
+	// TODO-Matt: look up `push constants` as an alternative way to do the same thing
+	intrinsics.mem_copy_non_overlapping(uniform_buffers_mapped[frame_index], &ubo, size_of(ubo))
 	wait_stages := []vk.PipelineStageFlags{{.COLOR_ATTACHMENT_OUTPUT}}
 	submit_info := vk.SubmitInfo {
 		sType                = .SUBMIT_INFO,
@@ -293,7 +316,7 @@ record_command_buffer :: proc(using state: ^RendererState) {
 		raw_data(vertex_buffers),
 		raw_data(offsets),
 	)
-  vk.CmdBindIndexBuffer(command_buffers[frame_index], state.index_buffer, 0, .UINT32)
+	vk.CmdBindIndexBuffer(command_buffers[frame_index], state.index_buffer, 0, .UINT32)
 	viewport := vk.Viewport {
 		x        = 0,
 		y        = 0,
@@ -302,20 +325,23 @@ record_command_buffer :: proc(using state: ^RendererState) {
 		minDepth = 0,
 		maxDepth = 1,
 	}
+	vk.CmdBindDescriptorSets(
+		command_buffers[frame_index],
+		.GRAPHICS,
+		state.pipeline_layout,
+		0,
+		1,
+		&state.descriptor_sets[frame_index],
+		0,
+		nil,
+	)
 	vk.CmdSetViewport(command_buffers[frame_index], 0, 1, &viewport)
 	scissor := vk.Rect2D {
 		offset = {0, 0},
 		extent = swapchain_extent,
 	}
 	vk.CmdSetScissor(command_buffers[frame_index], 0, 1, &scissor)
-	vk.CmdDrawIndexed(
-		command_buffers[frame_index],
-    cast(u32)len(indices),
-		1,
-		0,
-		0,
-    0,
-	)
+	vk.CmdDrawIndexed(command_buffers[frame_index], cast(u32)len(indices), 1, 0, 0, 0)
 	vk.CmdEndRenderPass(command_buffers[frame_index])
 	if res := vk.EndCommandBuffer(command_buffers[frame_index]); res != .SUCCESS {
 		panic("failed to record command buffer")

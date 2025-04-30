@@ -261,6 +261,27 @@ main :: proc() {
 		panic("failed to create fragment shader module")
 	}
 
+	// create descriptor set for uniform buffer object
+	ubo_descriptor_set_layout_binding := vk.DescriptorSetLayoutBinding {
+		descriptorType  = .UNIFORM_BUFFER,
+		descriptorCount = 1,
+		stageFlags      = {.VERTEX},
+	}
+	ubo_descriptor_set_layout_create_info := vk.DescriptorSetLayoutCreateInfo {
+		sType        = .DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		bindingCount = 1,
+		pBindings    = &ubo_descriptor_set_layout_binding,
+	}
+	if res := vk.CreateDescriptorSetLayout(
+		state.device,
+		&ubo_descriptor_set_layout_create_info,
+		nil,
+		&state.descriptor_set_layout,
+	); res != .SUCCESS {
+		panic("failed to create descriptor set layout")
+	}
+	defer vk.DestroyDescriptorSetLayout(state.device, state.descriptor_set_layout, nil)
+
 	// create graphics pipeline
 	vertex_shader_stage_create_info := vk.PipelineShaderStageCreateInfo {
 		sType  = .PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -339,7 +360,9 @@ main :: proc() {
 		pAttachments    = &pipeline_color_blend_attachment_state,
 	}
 	pipeline_layout_create_info := vk.PipelineLayoutCreateInfo {
-		sType = .PIPELINE_LAYOUT_CREATE_INFO,
+		sType          = .PIPELINE_LAYOUT_CREATE_INFO,
+		setLayoutCount = 1,
+		pSetLayouts    = &state.descriptor_set_layout,
 	}
 	if res := vk.CreatePipelineLayout(
 		state.device,
@@ -507,6 +530,93 @@ main :: proc() {
 	defer {
 		vk.DestroyBuffer(state.device, state.index_buffer, nil)
 		vk.FreeMemory(state.device, state.index_buffer_memory, nil)
+	}
+
+	{ 	// create uniform buffers
+		buffer_size := cast(vk.DeviceSize)size_of(UniformBufferObject)
+
+		for i in 0 ..< MAX_FRAMES_IN_FLIGHT {
+			state.uniform_buffers[i], state.uniform_buffers_memory[i] = create_buffer(
+				&state,
+				buffer_size,
+				{.UNIFORM_BUFFER},
+				{.HOST_VISIBLE, .HOST_COHERENT},
+			)
+			vk.MapMemory(
+				state.device,
+				state.uniform_buffers_memory[i],
+				0,
+				buffer_size,
+				{},
+				&state.uniform_buffers_mapped[i],
+			)
+		}
+	}
+	defer {
+		for i in 0 ..< MAX_FRAMES_IN_FLIGHT {
+			vk.DestroyBuffer(state.device, state.uniform_buffers[i], nil)
+			vk.FreeMemory(state.device, state.uniform_buffers_memory[i], nil)
+		}
+	}
+
+	{ 	// create descriptor pool
+		descriptor_pool_size := vk.DescriptorPoolSize {
+			type            = .UNIFORM_BUFFER,
+			descriptorCount = MAX_FRAMES_IN_FLIGHT,
+		}
+		descriptor_pool_create_info := vk.DescriptorPoolCreateInfo {
+			sType         = .DESCRIPTOR_POOL_CREATE_INFO,
+			poolSizeCount = 1,
+			pPoolSizes    = &descriptor_pool_size,
+			maxSets       = MAX_FRAMES_IN_FLIGHT,
+		}
+		if res := vk.CreateDescriptorPool(
+			state.device,
+			&descriptor_pool_create_info,
+			nil,
+			&state.descriptor_pool,
+		); res != .SUCCESS {
+			panic("failed to create descriptor pool")
+		}
+	}
+	defer vk.DestroyDescriptorPool(state.device, state.descriptor_pool, nil)
+
+	{ 	// allocate and configure descriptor sets
+		layouts := [MAX_FRAMES_IN_FLIGHT]vk.DescriptorSetLayout {
+			state.descriptor_set_layout,
+			state.descriptor_set_layout,
+		}
+		allocate_info := vk.DescriptorSetAllocateInfo {
+			sType              = .DESCRIPTOR_SET_ALLOCATE_INFO,
+			descriptorPool     = state.descriptor_pool,
+			descriptorSetCount = MAX_FRAMES_IN_FLIGHT,
+			pSetLayouts        = &layouts[0],
+		}
+		if res := vk.AllocateDescriptorSets(
+			state.device,
+			&allocate_info,
+			&state.descriptor_sets[0],
+		); res != .SUCCESS {
+			panic("failed to allocate descriptor sets")
+		}
+
+		for i in 0 ..< MAX_FRAMES_IN_FLIGHT {
+			descriptor_buffer_info := vk.DescriptorBufferInfo {
+				buffer = state.uniform_buffers[i],
+				offset = 0,
+				range  = size_of(UniformBufferObject),
+			}
+			write_descriptor_set := vk.WriteDescriptorSet {
+				sType           = .WRITE_DESCRIPTOR_SET,
+				dstSet          = state.descriptor_sets[i],
+				dstBinding      = 0,
+				dstArrayElement = 0,
+				descriptorType  = .UNIFORM_BUFFER,
+				descriptorCount = 1,
+				pBufferInfo     = &descriptor_buffer_info,
+			}
+			vk.UpdateDescriptorSets(state.device, 1, &write_descriptor_set, 0, nil)
+		}
 	}
 
 	// create command buffers
