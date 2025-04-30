@@ -3,7 +3,9 @@
 */
 /*
   TODO-Matt
-  - use uniform to update the drawn image each frame (colour / position)
+  - texture sampling - draw an image on our square
+  - cpu positioning logic - bounce the square off the edges of the screen without ever leaving the screen
+  - cpu responding to input - reverse direction on pressing space
 */
 package main
 
