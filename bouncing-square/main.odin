@@ -496,13 +496,67 @@ main :: proc() {
 	defer vk.DestroyCommandPool(state.device, state.command_pool, nil)
 
 	{ 	// create texture image
-    // filename: cstring, x, y, channels_in_file: ^c.int, desired_channels: c.int
-    width, height, channel_count: i32
-    pixels := image.load("./smiley.png", &width, &height, &channel_count, 0)
-    if channel_count != 4 {
-      panic("ASSERT - I've assumed 4 channel input images")
-    }
-    image_size := cast(vk.DeviceSize)(width * height * 4)
+		width, height, channel_count: i32
+		pixels := image.load("./smiley.png", &width, &height, &channel_count, 0)
+		if channel_count != 4 {
+			panic("ASSERT - I've assumed 4 channel input images")
+		}
+		image_size := cast(vk.DeviceSize)(width * height * 4)
+		staging_buffer, staging_buffer_memory := create_buffer(
+			&state,
+			image_size,
+			{.TRANSFER_SRC},
+			{.HOST_VISIBLE, .HOST_COHERENT},
+		)
+		staging_buffer_data: rawptr
+		vk.MapMemory(state.device, staging_buffer_memory, 0, image_size, {}, &staging_buffer_data)
+		intrinsics.mem_copy_non_overlapping(staging_buffer_data, pixels, image_size)
+		vk.UnmapMemory(state.device, staging_buffer_memory)
+		texture_image_create_info := vk.ImageCreateInfo {
+			sType = .IMAGE_CREATE_INFO,
+			imageType = .D2,
+			extent = {width = cast(u32)width, height = cast(u32)height, depth = 1},
+			mipLevels = 1,
+			arrayLayers = 1,
+			format = .R8G8B8A8_SRGB,
+			tiling = .OPTIMAL,
+			initialLayout = .UNDEFINED,
+			usage = {.TRANSFER_DST, .SAMPLED},
+			sharingMode = .EXCLUSIVE,
+			samples = {._1},
+		}
+		if res := vk.CreateImage(
+			state.device,
+			&texture_image_create_info,
+			nil,
+			&state.texture_image,
+		); res != .SUCCESS {
+			panic("failed to create texture image")
+		}
+		image_memory_requirements: vk.MemoryRequirements
+		vk.GetImageMemoryRequirements(
+			state.device,
+			state.texture_image,
+			&image_memory_requirements,
+		)
+		image_allocate_info := vk.MemoryAllocateInfo {
+			sType           = .MEMORY_ALLOCATE_INFO,
+			allocationSize  = image_memory_requirements.size,
+			memoryTypeIndex = find_memory_type(
+				&state,
+				image_memory_requirements.memoryTypeBits,
+				{.DEVICE_LOCAL},
+			),
+		}
+		if res := vk.AllocateMemory(
+			state.device,
+			&image_allocate_info,
+			nil,
+			&state.texture_image_memory,
+		); res != .SUCCESS {
+			panic("failed to allocate image memory")
+		}
+		vk.BindImageMemory(state.device, state.texture_image, state.texture_image_memory, 0)
 	}
 
 	{ 	// create vertex buffer, allocate memory for it, and bind buffer to memory

@@ -74,6 +74,8 @@ RendererState :: struct {
 	sync_fences_in_flight:           [MAX_FRAMES_IN_FLIGHT]vk.Fence,
 	sync_semaphores_image_available: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
 	sync_semaphores_render_finished: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
+	texture_image:                   vk.Image,
+	texture_image_memory:            vk.DeviceMemory,
 	uniform_buffers:                 [MAX_FRAMES_IN_FLIGHT]vk.Buffer,
 	uniform_buffers_memory:          [MAX_FRAMES_IN_FLIGHT]vk.DeviceMemory,
 	uniform_buffers_mapped:          [MAX_FRAMES_IN_FLIGHT]rawptr,
