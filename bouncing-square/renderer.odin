@@ -77,6 +77,7 @@ RendererState :: struct {
 	texture_image:                   vk.Image,
 	texture_image_memory:            vk.DeviceMemory,
 	texture_image_view:              vk.ImageView,
+	texture_sampler:                 vk.Sampler,
 	uniform_buffers:                 [MAX_FRAMES_IN_FLIGHT]vk.Buffer,
 	uniform_buffers_memory:          [MAX_FRAMES_IN_FLIGHT]vk.DeviceMemory,
 	uniform_buffers_mapped:          [MAX_FRAMES_IN_FLIGHT]rawptr,
@@ -391,6 +392,12 @@ check_extension_support :: proc(device: vk.PhysicalDevice) -> bool {
 		}
 	}
 	return true
+}
+
+check_feature_support :: proc(device: vk.PhysicalDevice) -> b32 {
+	supported_features: vk.PhysicalDeviceFeatures
+	vk.GetPhysicalDeviceFeatures(device, &supported_features)
+	return supported_features.samplerAnisotropy
 }
 
 get_physical_devices :: proc(instance: vk.Instance) -> []vk.PhysicalDevice {

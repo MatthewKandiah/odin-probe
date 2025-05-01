@@ -115,6 +115,9 @@ main :: proc() {
 			if !check_extension_support(physical_device) {
 				continue
 			}
+			if !check_feature_support(physical_device) {
+				continue
+			}
 			vk.GetPhysicalDeviceProperties(physical_device, &properties)
 			if properties.deviceType == .DISCRETE_GPU {
 				state.physical_device = physical_device
@@ -179,12 +182,16 @@ main :: proc() {
 			pQueuePriorities = &queue_priority,
 		}
 		queue_create_infos: []vk.DeviceQueueCreateInfo = {device_queue_create_info}
+		required_device_features := vk.PhysicalDeviceFeatures {
+			samplerAnisotropy = true,
+		}
 		device_create_info := vk.DeviceCreateInfo {
 			sType                   = .DEVICE_CREATE_INFO,
 			pQueueCreateInfos       = raw_data(queue_create_infos),
 			queueCreateInfoCount    = cast(u32)len(queue_create_infos),
 			ppEnabledExtensionNames = raw_data(REQUIRED_EXTENSION_NAMES),
 			enabledExtensionCount   = cast(u32)len(REQUIRED_EXTENSION_NAMES),
+			pEnabledFeatures        = &required_device_features,
 		}
 		if res := vk.CreateDevice(state.physical_device, &device_create_info, nil, &state.device);
 		   res != vk.Result.SUCCESS {
@@ -612,6 +619,38 @@ main :: proc() {
 		}
 	}
 	defer vk.DestroyImageView(state.device, state.texture_image_view, nil)
+
+	{ 	// create texture sampler
+		physical_device_properties: vk.PhysicalDeviceProperties
+		vk.GetPhysicalDeviceProperties(state.physical_device, &physical_device_properties)
+		sampler_create_info := vk.SamplerCreateInfo {
+			sType                   = .SAMPLER_CREATE_INFO,
+			magFilter               = .LINEAR,
+			minFilter               = .LINEAR,
+			addressModeU            = .REPEAT,
+			addressModeV            = .REPEAT,
+			addressModeW            = .REPEAT,
+			anisotropyEnable        = true,
+			maxAnisotropy           = physical_device_properties.limits.maxSamplerAnisotropy,
+			borderColor             = .INT_OPAQUE_BLACK,
+			unnormalizedCoordinates = false,
+			compareEnable           = false,
+			compareOp               = .ALWAYS,
+			mipmapMode              = .LINEAR,
+			mipLodBias              = 0,
+			minLod                  = 0,
+			maxLod                  = 0,
+		}
+		if res := vk.CreateSampler(
+			state.device,
+			&sampler_create_info,
+			nil,
+			&state.texture_sampler,
+		); res != .SUCCESS {
+			panic("failed to create texture sampler")
+		}
+	}
+	defer vk.DestroySampler(state.device, state.texture_sampler, nil)
 
 	{ 	// create vertex buffer, allocate memory for it, and bind buffer to memory
 		buffer_size := cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices))
