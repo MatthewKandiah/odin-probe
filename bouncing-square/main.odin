@@ -495,6 +495,16 @@ main :: proc() {
 	}
 	defer vk.DestroyCommandPool(state.device, state.command_pool, nil)
 
+	{ 	// create texture image
+    // filename: cstring, x, y, channels_in_file: ^c.int, desired_channels: c.int
+    width, height, channel_count: i32
+    pixels := image.load("./smiley.png", &width, &height, &channel_count, 0)
+    if channel_count != 4 {
+      panic("ASSERT - I've assumed 4 channel input images")
+    }
+    image_size := cast(vk.DeviceSize)(width * height * 4)
+	}
+
 	{ 	// create vertex buffer, allocate memory for it, and bind buffer to memory
 		buffer_size := cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices))
 
