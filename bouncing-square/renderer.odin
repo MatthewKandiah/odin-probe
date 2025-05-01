@@ -76,6 +76,7 @@ RendererState :: struct {
 	sync_semaphores_render_finished: [MAX_FRAMES_IN_FLIGHT]vk.Semaphore,
 	texture_image:                   vk.Image,
 	texture_image_memory:            vk.DeviceMemory,
+	texture_image_view:              vk.ImageView,
 	uniform_buffers:                 [MAX_FRAMES_IN_FLIGHT]vk.Buffer,
 	uniform_buffers_memory:          [MAX_FRAMES_IN_FLIGHT]vk.DeviceMemory,
 	uniform_buffers_mapped:          [MAX_FRAMES_IN_FLIGHT]rawptr,
@@ -558,20 +559,20 @@ transition_image_layout :: proc(
 			layerCount = 1,
 		},
 	}
-  source_stage, destination_stage: vk.PipelineStageFlags
-  if old_layout == .UNDEFINED && new_layout == .TRANSFER_DST_OPTIMAL {
-    memory_barrier.srcAccessMask = {}
-    memory_barrier.dstAccessMask = {.TRANSFER_WRITE}
-    source_stage = {.TOP_OF_PIPE}
-    destination_stage = {.TRANSFER}
-  } else if old_layout == .TRANSFER_DST_OPTIMAL && new_layout == .SHADER_READ_ONLY_OPTIMAL {
-    memory_barrier.srcAccessMask = {.TRANSFER_WRITE}
-    memory_barrier.dstAccessMask = {.SHADER_READ}
-    source_stage = {.TRANSFER}
-    destination_stage = {.FRAGMENT_SHADER}
-  } else {
-    panic("unsupported layout transition")
-  }
+	source_stage, destination_stage: vk.PipelineStageFlags
+	if old_layout == .UNDEFINED && new_layout == .TRANSFER_DST_OPTIMAL {
+		memory_barrier.srcAccessMask = {}
+		memory_barrier.dstAccessMask = {.TRANSFER_WRITE}
+		source_stage = {.TOP_OF_PIPE}
+		destination_stage = {.TRANSFER}
+	} else if old_layout == .TRANSFER_DST_OPTIMAL && new_layout == .SHADER_READ_ONLY_OPTIMAL {
+		memory_barrier.srcAccessMask = {.TRANSFER_WRITE}
+		memory_barrier.dstAccessMask = {.SHADER_READ}
+		source_stage = {.TRANSFER}
+		destination_stage = {.FRAGMENT_SHADER}
+	} else {
+		panic("unsupported layout transition")
+	}
 	vk.CmdPipelineBarrier(
 		temp_command_buffer,
 		source_stage,
