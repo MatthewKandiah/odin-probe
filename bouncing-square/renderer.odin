@@ -527,6 +527,67 @@ create_buffer :: proc(
 }
 
 copy_buffer :: proc(state: ^RendererState, src: vk.Buffer, dst: vk.Buffer, size: vk.DeviceSize) {
+	temp_command_buffer := begin_single_time_commands(state)
+	buffer_copy_info := vk.BufferCopy {
+		size = size,
+	}
+	vk.CmdCopyBuffer(temp_command_buffer, src, dst, 1, &buffer_copy_info)
+	end_single_time_commands(state, &temp_command_buffer)
+}
+
+transition_image_layout :: proc(
+	state: ^RendererState,
+	image: vk.Image,
+	format: vk.Format,
+	old_layout: vk.ImageLayout,
+	new_layout: vk.ImageLayout,
+) {
+	temp_command_buffer := begin_single_time_commands(state)
+	memory_barrier := vk.ImageMemoryBarrier {
+		sType = .IMAGE_MEMORY_BARRIER,
+		oldLayout = old_layout,
+		newLayout = new_layout,
+		srcQueueFamilyIndex = vk.QUEUE_FAMILY_IGNORED,
+		dstQueueFamilyIndex = vk.QUEUE_FAMILY_IGNORED,
+		image = image,
+		subresourceRange = {
+			aspectMask = {.COLOR},
+			baseMipLevel = 0,
+			levelCount = 1,
+			baseArrayLayer = 0,
+			layerCount = 1,
+		},
+	}
+  source_stage, destination_stage: vk.PipelineStageFlags
+  if old_layout == .UNDEFINED && new_layout == .TRANSFER_DST_OPTIMAL {
+    memory_barrier.srcAccessMask = {}
+    memory_barrier.dstAccessMask = {.TRANSFER_WRITE}
+    source_stage = {.TOP_OF_PIPE}
+    destination_stage = {.TRANSFER}
+  } else if old_layout == .TRANSFER_DST_OPTIMAL && new_layout == .SHADER_READ_ONLY_OPTIMAL {
+    memory_barrier.srcAccessMask = {.TRANSFER_WRITE}
+    memory_barrier.dstAccessMask = {.SHADER_READ}
+    source_stage = {.TRANSFER}
+    destination_stage = {.FRAGMENT_SHADER}
+  } else {
+    panic("unsupported layout transition")
+  }
+	vk.CmdPipelineBarrier(
+		temp_command_buffer,
+		source_stage,
+		destination_stage,
+		{},
+		0,
+		nil,
+		0,
+		nil,
+		1,
+		&memory_barrier,
+	)
+	end_single_time_commands(state, &temp_command_buffer)
+}
+
+begin_single_time_commands :: proc(state: ^RendererState) -> vk.CommandBuffer {
 	command_buffer_allocate_info := vk.CommandBufferAllocateInfo {
 		sType              = .COMMAND_BUFFER_ALLOCATE_INFO,
 		level              = .PRIMARY,
@@ -539,7 +600,7 @@ copy_buffer :: proc(state: ^RendererState, src: vk.Buffer, dst: vk.Buffer, size:
 		&command_buffer_allocate_info,
 		&temp_command_buffer,
 	); res != .SUCCESS {
-		panic("failed to allocate temporary command buffer for copy")
+		panic("failed to allocate temporary buffer for image transition")
 	}
 	command_buffer_begin_info := vk.CommandBufferBeginInfo {
 		sType = .COMMAND_BUFFER_BEGIN_INFO,
@@ -547,19 +608,51 @@ copy_buffer :: proc(state: ^RendererState, src: vk.Buffer, dst: vk.Buffer, size:
 	}
 	if res := vk.BeginCommandBuffer(temp_command_buffer, &command_buffer_begin_info);
 	   res != .SUCCESS {
-		panic("failed to begin temporary command buffer for copy")
+		panic("failed to begin temporary command buffer for image transition")
 	}
-	buffer_copy_info := vk.BufferCopy {
-		size = size,
-	}
-	vk.CmdCopyBuffer(temp_command_buffer, src, dst, 1, &buffer_copy_info)
-	vk.EndCommandBuffer(temp_command_buffer)
+	return temp_command_buffer
+}
+
+end_single_time_commands :: proc(state: ^RendererState, temp_command_buffer: ^vk.CommandBuffer) {
+	vk.EndCommandBuffer(temp_command_buffer^)
 	submit_info := vk.SubmitInfo {
 		sType              = .SUBMIT_INFO,
 		commandBufferCount = 1,
-		pCommandBuffers    = &temp_command_buffer,
+		pCommandBuffers    = temp_command_buffer,
 	}
 	vk.QueueSubmit(state.graphics_queue, 1, &submit_info, 0)
 	vk.QueueWaitIdle(state.graphics_queue)
-	vk.FreeCommandBuffers(state.device, state.command_pool, 1, &temp_command_buffer)
+	vk.FreeCommandBuffers(state.device, state.command_pool, 1, temp_command_buffer)
+}
+
+copy_buffer_to_image :: proc(
+	state: ^RendererState,
+	buffer: vk.Buffer,
+	image: vk.Image,
+	width: u32,
+	height: u32,
+) {
+	temp_command_buffer := begin_single_time_commands(state)
+	buffer_image_copy := vk.BufferImageCopy {
+		bufferOffset = 0,
+		bufferRowLength = 0,
+		bufferImageHeight = 0,
+		imageSubresource = {
+			aspectMask = {.COLOR},
+			mipLevel = 0,
+			baseArrayLayer = 0,
+			layerCount = 1,
+		},
+		imageOffset = {0, 0, 0},
+		imageExtent = {width, height, 1},
+	}
+	vk.CmdCopyBufferToImage(
+		temp_command_buffer,
+		buffer,
+		image,
+		.TRANSFER_DST_OPTIMAL,
+		1,
+		&buffer_image_copy,
+	)
+	end_single_time_commands(state, &temp_command_buffer)
 }

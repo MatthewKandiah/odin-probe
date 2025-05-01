@@ -508,6 +508,10 @@ main :: proc() {
 			{.TRANSFER_SRC},
 			{.HOST_VISIBLE, .HOST_COHERENT},
 		)
+    defer {
+      vk.DestroyBuffer(state.device, staging_buffer, nil)
+      vk.FreeMemory(state.device, staging_buffer_memory, nil)
+    }
 		staging_buffer_data: rawptr
 		vk.MapMemory(state.device, staging_buffer_memory, 0, image_size, {}, &staging_buffer_data)
 		intrinsics.mem_copy_non_overlapping(staging_buffer_data, pixels, image_size)
@@ -557,11 +561,32 @@ main :: proc() {
 			panic("failed to allocate image memory")
 		}
 		vk.BindImageMemory(state.device, state.texture_image, state.texture_image_memory, 0)
+		transition_image_layout(
+			&state,
+			state.texture_image,
+			.R8G8B8A8_SRGB,
+			.UNDEFINED,
+			.TRANSFER_DST_OPTIMAL,
+		)
+		copy_buffer_to_image(
+			&state,
+			staging_buffer,
+			state.texture_image,
+			cast(u32)width,
+			cast(u32)height,
+		)
+		transition_image_layout(
+			&state,
+			state.texture_image,
+			.R8G8B8A8_SRGB,
+			.TRANSFER_DST_OPTIMAL,
+			.SHADER_READ_ONLY_OPTIMAL,
+		)
 	}
-
-	// TODO-Matt
-	{ 	// transition texture image layout
-	}
+  defer {
+    vk.DestroyImage(state.device, state.texture_image, nil)
+    vk.FreeMemory(state.device, state.texture_image_memory, nil)
+  }
 
 	{ 	// create vertex buffer, allocate memory for it, and bind buffer to memory
 		buffer_size := cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices))
