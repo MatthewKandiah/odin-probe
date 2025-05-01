@@ -19,7 +19,6 @@ Vertex :: struct {
 	color: glsl.vec3,
 }
 
-// TODO-Matt: assumed that the memory layout matches what the glsl shader expects, not checked this
 UniformBufferObject :: struct {
 	translation: glsl.vec2,
 }
