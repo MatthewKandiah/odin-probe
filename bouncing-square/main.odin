@@ -559,6 +559,10 @@ main :: proc() {
 		vk.BindImageMemory(state.device, state.texture_image, state.texture_image_memory, 0)
 	}
 
+	// TODO-Matt
+	{ 	// transition texture image layout
+	}
+
 	{ 	// create vertex buffer, allocate memory for it, and bind buffer to memory
 		buffer_size := cast(vk.DeviceSize)(size_of(vertices[0]) * len(vertices))
 
