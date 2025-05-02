@@ -1120,7 +1120,6 @@ draw_frame :: proc(using state: ^RendererState, pos: glsl.vec2) {
 	ubo := UniformBufferObject {
     translation = pos,
 	}
-	// TODO-Matt: look up `push constants` as an alternative way to do the same thing
 	intrinsics.mem_copy_non_overlapping(uniform_buffers_mapped[frame_index], &ubo, size_of(ubo))
 	wait_stages := []vk.PipelineStageFlags{{.COLOR_ATTACHMENT_OUTPUT}}
 	submit_info := vk.SubmitInfo {
