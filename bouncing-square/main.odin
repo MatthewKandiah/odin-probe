@@ -6,6 +6,7 @@
   - texture sampling - draw an image on our square
   - cpu positioning logic - bounce the square off the edges of the screen without ever leaving the screen
   - cpu responding to input - reverse direction on pressing space
+  - read https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/main/docs/best_practices.md might be useful to enable in next project!
 */
 package main
 
@@ -290,16 +291,28 @@ main :: proc() {
 		}
 	}
 
-	{ 	// create descriptor set for uniform buffer object
-		descriptor_set_layout_binding := vk.DescriptorSetLayoutBinding {
+	{ 	// create descriptor sets for uniform buffer object and combined image sampler
+		descriptor_set_layout_binding_ubo := vk.DescriptorSetLayoutBinding {
+			binding         = 0,
 			descriptorType  = .UNIFORM_BUFFER,
 			descriptorCount = 1,
 			stageFlags      = {.VERTEX},
 		}
+		descriptor_set_layout_binding_sampler := vk.DescriptorSetLayoutBinding {
+			binding            = 1,
+			descriptorType     = .COMBINED_IMAGE_SAMPLER,
+			descriptorCount    = 1,
+			pImmutableSamplers = nil,
+			stageFlags         = {.FRAGMENT},
+		}
+		descriptor_set_bindings := []vk.DescriptorSetLayoutBinding {
+			descriptor_set_layout_binding_ubo,
+			descriptor_set_layout_binding_sampler,
+		}
 		descriptor_set_layout_create_info := vk.DescriptorSetLayoutCreateInfo {
 			sType        = .DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			bindingCount = 1,
-			pBindings    = &descriptor_set_layout_binding,
+			bindingCount = cast(u32)len(descriptor_set_bindings),
+			pBindings    = raw_data(descriptor_set_bindings),
 		}
 		if res := vk.CreateDescriptorSetLayout(
 			state.device,
@@ -744,14 +757,22 @@ main :: proc() {
 	}
 
 	{ 	// create descriptor pool
-		descriptor_pool_size := vk.DescriptorPoolSize {
+		descriptor_pool_size_ubo := vk.DescriptorPoolSize {
 			type            = .UNIFORM_BUFFER,
 			descriptorCount = MAX_FRAMES_IN_FLIGHT,
 		}
+		descriptor_pool_size_sampler := vk.DescriptorPoolSize {
+			type            = .COMBINED_IMAGE_SAMPLER,
+			descriptorCount = MAX_FRAMES_IN_FLIGHT,
+		}
+		pool_sizes := []vk.DescriptorPoolSize {
+			descriptor_pool_size_ubo,
+			descriptor_pool_size_sampler,
+		}
 		descriptor_pool_create_info := vk.DescriptorPoolCreateInfo {
 			sType         = .DESCRIPTOR_POOL_CREATE_INFO,
-			poolSizeCount = 1,
-			pPoolSizes    = &descriptor_pool_size,
+			poolSizeCount = cast(u32)len(pool_sizes),
+			pPoolSizes    = raw_data(pool_sizes),
 			maxSets       = MAX_FRAMES_IN_FLIGHT,
 		}
 		if res := vk.CreateDescriptorPool(
@@ -790,7 +811,12 @@ main :: proc() {
 				offset = 0,
 				range  = size_of(UniformBufferObject),
 			}
-			write_descriptor_set := vk.WriteDescriptorSet {
+			descriptor_image_info := vk.DescriptorImageInfo {
+				imageLayout = .SHADER_READ_ONLY_OPTIMAL,
+				imageView   = state.texture_image_view,
+				sampler     = state.texture_sampler,
+			}
+			descriptor_write_buffer := vk.WriteDescriptorSet {
 				sType           = .WRITE_DESCRIPTOR_SET,
 				dstSet          = state.descriptor_sets[i],
 				dstBinding      = 0,
@@ -799,7 +825,17 @@ main :: proc() {
 				descriptorCount = 1,
 				pBufferInfo     = &descriptor_buffer_info,
 			}
-			vk.UpdateDescriptorSets(state.device, 1, &write_descriptor_set, 0, nil)
+			descriptor_write_sampler := vk.WriteDescriptorSet {
+				sType           = .WRITE_DESCRIPTOR_SET,
+				dstSet          = state.descriptor_sets[i],
+				dstBinding     = 1,
+				dstArrayElement = 0,
+				descriptorType  = .COMBINED_IMAGE_SAMPLER,
+				descriptorCount = 1,
+				pImageInfo      = &descriptor_image_info,
+			}
+      descriptor_writes := []vk.WriteDescriptorSet {descriptor_write_buffer, descriptor_write_sampler}
+			vk.UpdateDescriptorSets(state.device, 1, raw_data(descriptor_writes), 0, nil)
 		}
 	}
 
