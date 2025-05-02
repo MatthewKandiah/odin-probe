@@ -1100,9 +1100,7 @@ recreate_swapchain :: proc(state: ^RendererState) {
 	setup_new_framebuffers(state)
 }
 
-start_time := time.now()._nsec
-
-draw_frame :: proc(using state: ^RendererState) {
+draw_frame :: proc(using state: ^RendererState, pos: glsl.vec2) {
 	vk.WaitForFences(device, 1, &sync_fences_in_flight[frame_index], true, max(u64))
 	acquire_next_image_res := vk.AcquireNextImageKHR(
 		device,
@@ -1119,10 +1117,8 @@ draw_frame :: proc(using state: ^RendererState) {
 	vk.ResetFences(device, 1, &sync_fences_in_flight[frame_index])
 	vk.ResetCommandBuffer(command_buffers[frame_index], {})
 	record_command_buffer(state)
-	current_time := time.now()._nsec
-	time: f32 = cast(f32)((current_time - start_time) * 15 / 1_000_000_000)
 	ubo := UniformBufferObject {
-		translation = {math.sin(time) / 5, 0},
+    translation = pos,
 	}
 	// TODO-Matt: look up `push constants` as an alternative way to do the same thing
 	intrinsics.mem_copy_non_overlapping(uniform_buffers_mapped[frame_index], &ubo, size_of(ubo))

@@ -12,7 +12,9 @@ package main
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
+import "core:math"
 import "core:math/linalg/glsl"
+import "core:time"
 import "core:os"
 import "vendor:glfw"
 import vk "vendor:vulkan"
@@ -27,13 +29,18 @@ vertices :: []Vertex {
 indices :: []u32{0, 1, 2, 2, 3, 0}
 
 main :: proc() {
-  state := setup_renderer()
-  defer cleanup_renderer(state)
+	state := setup_renderer()
+	defer cleanup_renderer(state)
+
+	start_time := time.now()._nsec
 
 	// main loop
 	for !glfw.WindowShouldClose(state.window) {
 		glfw.PollEvents()
-		draw_frame(&state)
+		current_time := time.now()._nsec
+		time: f32 = cast(f32)((current_time - start_time) * 15 / 1_000_000_000)
+		pos := glsl.vec2{math.sin(time) / 5, 0}
+		draw_frame(&state, pos)
 	}
 	vk.DeviceWaitIdle(state.device)
 }
