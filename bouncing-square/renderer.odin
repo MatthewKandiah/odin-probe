@@ -15,8 +15,9 @@ REQUIRED_EXTENSION_NAMES := []cstring{vk.KHR_SWAPCHAIN_EXTENSION_NAME}
 MAX_FRAMES_IN_FLIGHT :: 2
 
 Vertex :: struct {
-	pos:   glsl.vec2,
-	color: glsl.vec3,
+	pos:       glsl.vec2,
+	color:     glsl.vec3,
+	tex_coord: glsl.vec2,
 }
 
 UniformBufferObject :: struct {
@@ -29,13 +30,19 @@ vertex_input_binding_description := vk.VertexInputBindingDescription {
 	inputRate = .VERTEX,
 }
 
-vertex_input_attribute_descriptions := [2]vk.VertexInputAttributeDescription {
+vertex_input_attribute_descriptions := [3]vk.VertexInputAttributeDescription {
 	{binding = 0, location = 0, format = .R32G32_SFLOAT, offset = cast(u32)offset_of(Vertex, pos)},
 	{
 		binding = 0,
 		location = 1,
 		format = .R32G32B32_SFLOAT,
 		offset = cast(u32)offset_of(Vertex, color),
+	},
+	{
+		binding = 0,
+		location = 2,
+		format = .R32G32_SFLOAT,
+		offset = cast(u32)offset_of(Vertex, tex_coord),
 	},
 }
 

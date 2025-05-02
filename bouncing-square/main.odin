@@ -23,10 +23,10 @@ WINDOW_WIDTH :: 800
 WINDOW_HEIGHT :: 600
 
 vertices :: []Vertex {
-	{{-0.5, -0.5}, {1, 0, 0}}, // top left
-	{{0.5, -0.5}, {0, 1, 0}}, // top right
-	{{0.5, 0.5}, {0, 0, 1}}, // bottom right
-	{{-0.5, 0.5}, {1, 1, 1}}, // bottom left
+	{{-0.5, -0.5}, {1, 0, 0}, {1, 0}}, // top left
+	{{0.5, -0.5}, {0, 1, 0}, {0, 0}}, // top right
+	{{0.5, 0.5}, {0, 0, 1}, {0, 1}}, // bottom right
+	{{-0.5, 0.5}, {1, 1, 1}, {1, 1}}, // bottom left
 }
 
 indices :: []u32{0, 1, 2, 2, 3, 0}
@@ -828,14 +828,17 @@ main :: proc() {
 			descriptor_write_sampler := vk.WriteDescriptorSet {
 				sType           = .WRITE_DESCRIPTOR_SET,
 				dstSet          = state.descriptor_sets[i],
-				dstBinding     = 1,
+				dstBinding      = 1,
 				dstArrayElement = 0,
 				descriptorType  = .COMBINED_IMAGE_SAMPLER,
 				descriptorCount = 1,
 				pImageInfo      = &descriptor_image_info,
 			}
-      descriptor_writes := []vk.WriteDescriptorSet {descriptor_write_buffer, descriptor_write_sampler}
-			vk.UpdateDescriptorSets(state.device, 1, raw_data(descriptor_writes), 0, nil)
+			descriptor_writes := []vk.WriteDescriptorSet {
+				descriptor_write_buffer,
+				descriptor_write_sampler,
+			}
+			vk.UpdateDescriptorSets(state.device, cast(u32)len(descriptor_writes), raw_data(descriptor_writes), 0, nil)
 		}
 	}
 
