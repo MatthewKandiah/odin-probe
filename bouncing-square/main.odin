@@ -291,19 +291,19 @@ main :: proc() {
 	}
 
 	{ 	// create descriptor set for uniform buffer object
-		ubo_descriptor_set_layout_binding := vk.DescriptorSetLayoutBinding {
+		descriptor_set_layout_binding := vk.DescriptorSetLayoutBinding {
 			descriptorType  = .UNIFORM_BUFFER,
 			descriptorCount = 1,
 			stageFlags      = {.VERTEX},
 		}
-		ubo_descriptor_set_layout_create_info := vk.DescriptorSetLayoutCreateInfo {
+		descriptor_set_layout_create_info := vk.DescriptorSetLayoutCreateInfo {
 			sType        = .DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
 			bindingCount = 1,
-			pBindings    = &ubo_descriptor_set_layout_binding,
+			pBindings    = &descriptor_set_layout_binding,
 		}
 		if res := vk.CreateDescriptorSetLayout(
 			state.device,
-			&ubo_descriptor_set_layout_create_info,
+			&descriptor_set_layout_create_info,
 			nil,
 			&state.descriptor_set_layout,
 		); res != .SUCCESS {
