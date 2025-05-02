@@ -39,7 +39,7 @@ main :: proc() {
 		glfw.PollEvents()
 		current_time := time.now()._nsec
 		time: f32 = cast(f32)((current_time - start_time) * 15 / 1_000_000_000)
-		pos := glsl.vec2{math.sin(time) / 5, 0}
+		pos := glsl.vec2{math.sin(time) / 5, math.cos(time) / 5}
 		draw_frame(&state, pos)
 	}
 	vk.DeviceWaitIdle(state.device)
